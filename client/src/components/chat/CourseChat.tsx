@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Markdown } from '@/components/ui/markdown';
 import {
   MessageSquare,
   Sparkles,
@@ -251,7 +252,7 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
                     </div>
                     <div className="space-y-3 text-sm text-foreground/90 leading-relaxed min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="whitespace-pre-line flex-1">{msg.answer}</p>
+                        <Markdown content={msg.answer} className="flex-1 text-sm" />
                         {msg.cached && (
                           <Badge
                             variant="secondary"

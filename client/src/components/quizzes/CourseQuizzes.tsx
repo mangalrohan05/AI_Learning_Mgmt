@@ -6,6 +6,7 @@ import { api, Material } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Markdown } from '@/components/ui/markdown';
 import {
   Dialog,
   DialogContent,
@@ -318,8 +319,8 @@ export function CourseQuizzes({
                   </div>
 
                   <div className="pt-2 text-xs text-muted-foreground border-t border-border/40">
-                    <strong className="text-foreground">Explanation: </strong>
-                    {res.explanation}
+                    <strong className="text-foreground block mb-1">Explanation:</strong>
+                    <Markdown content={res.explanation} className="text-xs" />
                   </div>
                 </div>
               </div>

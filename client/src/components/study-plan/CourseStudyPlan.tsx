@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Markdown } from '@/components/ui/markdown';
 import {
   CalendarCheck,
   Sparkles,
@@ -210,9 +211,10 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
                 Updated {new Date(studyPlan.updatedAt).toLocaleDateString()}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {studyPlan.plan.overview}
-            </p>
+            <Markdown
+              content={studyPlan.plan.overview}
+              className="text-xs text-muted-foreground leading-relaxed"
+            />
           </Card>
 
           {/* Schedule Breakdown */}

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Markdown } from '@/components/ui/markdown';
 import {
   GraduationCap,
   Send,
@@ -164,7 +165,11 @@ export function CourseTutor({ courseId }: { courseId: string }) {
                     <span>Tutor</span>
                   </div>
                 )}
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                {isUser ? (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                ) : (
+                  <Markdown content={msg.content} className="text-sm" />
+                )}
 
                 {/* Sources collapsible */}
                 {msg.sources && msg.sources.length > 0 && (

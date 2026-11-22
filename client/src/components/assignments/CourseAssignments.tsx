@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Markdown } from '@/components/ui/markdown';
 import {
   FileText,
   UploadCloud,
@@ -212,9 +213,10 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
                   </div>
                 </div>
 
-                <p className="text-xs text-foreground/90 leading-relaxed mt-3">
-                  {selectedAssignment.feedback.summary}
-                </p>
+                <Markdown
+                  content={selectedAssignment.feedback.summary}
+                  className="text-xs text-foreground/90 leading-relaxed mt-3"
+                />
               </Card>
 
               {/* Strengths & Weaknesses */}
