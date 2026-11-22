@@ -77,57 +77,6 @@ async function main() {
   });
 
   console.log(`  ✔ Enrollments: Bob enrolled in both courses`);
-
-  // ── Materials (metadata only — no real files) ───────────────
-  await prisma.material.upsert({
-    where: { id: 'seed_mat_01' },
-    update: {},
-    create: {
-      id:          'seed_mat_01',
-      courseId:    mlCourse.id,
-      uploaderId:  alice.id,
-      name:        'Week 1 – Intro to ML.pdf',
-      type:        MaterialType.PDF,
-      status:      MaterialStatus.READY,
-      storagePath: 'uploads/seed/week1-intro-ml.pdf',
-      mimeType:    'application/pdf',
-      size:        2_048_000,
-    },
-  });
-
-  await prisma.material.upsert({
-    where: { id: 'seed_mat_02' },
-    update: {},
-    create: {
-      id:          'seed_mat_02',
-      courseId:    mlCourse.id,
-      uploaderId:  alice.id,
-      name:        'Linear Regression Notes.txt',
-      type:        MaterialType.TXT,
-      status:      MaterialStatus.READY,
-      storagePath: 'uploads/seed/linear-regression.txt',
-      mimeType:    'text/plain',
-      size:        15_000,
-    },
-  });
-
-  await prisma.material.upsert({
-    where: { id: 'seed_mat_03' },
-    update: {},
-    create: {
-      id:          'seed_mat_03',
-      courseId:    dsCourse.id,
-      uploaderId:  alice.id,
-      name:        'Big O Notation.pdf',
-      type:        MaterialType.PDF,
-      status:      MaterialStatus.READY,
-      storagePath: 'uploads/seed/big-o-notation.pdf',
-      mimeType:    'application/pdf',
-      size:        1_024_000,
-    },
-  });
-
-  console.log(`  ✔ Materials: 3 rows (metadata only, no real files)`);
   console.log('✅  Seed complete.');
 }
 

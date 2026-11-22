@@ -166,9 +166,7 @@ export class ProcessingService {
         );
       }
 
-      console.log(`[ProcessingService] Generating embeddings for ${targetChunks.length} chunks...`);
       const embeddings = await embedDocuments(targetChunks);
-      console.log(`[ProcessingService] Generated ${embeddings.length} embeddings. Sample length: ${embeddings[0]?.length}`);
 
       // 5. Delete any existing chunks for this material (idempotency)
       await prisma.documentChunk.deleteMany({

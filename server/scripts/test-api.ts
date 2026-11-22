@@ -3,7 +3,7 @@ import { courseService } from '../src/services/courseService';
 import { materialService } from '../src/services/materialService';
 import { storageProvider } from '../src/services/storage/localStorageProvider';
 import { validateFileSize, EXTENSION_MAP, MIME_TYPE_MAP } from '../src/middleware/upload';
-import { MaterialType } from '@prisma/client';
+import { MaterialType, MaterialStatus } from '@prisma/client';
 import { AppError } from '../src/middleware/errorHandler';
 
 /**
@@ -69,6 +69,21 @@ async function runTests() {
     console.log(`[Setup] Bob: ${bob.name} (Seed Enrolled)`);
     console.log(`[Setup] Charlie: ${charlie.name} (Temporary Non-member)\n`);
 
+    // Create a temporary material for permission testing
+    const testMaterial = await prisma.material.create({
+      data: {
+        courseId: mlCourse.id,
+        uploaderId: alice.id,
+        name: 'Test Permission Doc.pdf',
+        type: MaterialType.PDF,
+        status: MaterialStatus.READY,
+        storagePath: 'uploads/test_perm_doc.pdf',
+        mimeType: 'application/pdf',
+        size: 1024,
+      },
+    });
+    createdMaterialIds.push(testMaterial.id);
+
     // ── TEST 1: 403 for Non-Member Accessing Course Details ───────
     try {
       await courseService.getCourseById(mlCourse.id, charlie.id);
@@ -132,7 +147,7 @@ async function runTests() {
 
     // ── TEST 6: 403 for Non-Owner/Non-Uploader Deleting Material ──
     try {
-      await materialService.deleteMaterial('seed_mat_01', charlie.id);
+      await materialService.deleteMaterial(testMaterial.id, charlie.id);
       assert(false, '403 for non-owner/non-uploader deleting material', 'Expected 403 AppError');
     } catch (err: any) {
       assert(
@@ -222,7 +237,7 @@ async function runTests() {
 
     // ── TEST 13: Download Permission Check (403 for non-member) ──
     try {
-      await materialService.getMaterialForDownload('seed_mat_01', charlie.id);
+      await materialService.getMaterialForDownload(testMaterial.id, charlie.id);
       assert(false, '403 for non-member downloading material', 'Expected 403 AppError');
     } catch (err: any) {
       assert(

@@ -67,7 +67,7 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* Footer Info */}
       <div className="pt-4 border-t border-border px-3 text-xs text-muted-foreground">
-        <p className="font-medium text-foreground">Phase 1 Foundation</p>
+        <p className="font-medium text-foreground">AI LMS Platform</p>
         <p className="mt-0.5">BE Information Tech</p>
       </div>
     </aside>

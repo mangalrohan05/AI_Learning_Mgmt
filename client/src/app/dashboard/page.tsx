@@ -85,7 +85,7 @@ export default function DashboardOverviewPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 mb-2">
               <Badge variant="default" className="text-[10px]">
-                Phase 3 Active
+                AI-Powered Learning
               </Badge>
               <span className="text-xs text-muted-foreground font-medium">
                 AI Tutor • Quizzes • Study Planner • Assignments

@@ -1,10 +1,16 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { StorageFile, StorageProvider } from './storageProvider';
 import { env } from '../../config/env';
 
-export class LocalStorageProvider implements StorageProvider {
+export interface StorageFile {
+  originalName: string;
+  storagePath: string;
+  mimeType: string;
+  size: number;
+}
+
+export class LocalStorageProvider {
   private uploadDir: string;
 
   constructor(uploadDir?: string) {
