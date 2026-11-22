@@ -82,7 +82,7 @@ Validated test cases:
 7. `403` Forbidden when non-owner / non-uploader deletes a material
 8. Rejected invalid file extensions & MIME types (e.g. `.exe`, `.js`)
 9. Rejected oversized documents (`> 50MB`)
-10. Rejected oversized audio recordings (`> 200MB`)
+10. Rejected oversized audio recordings (`> 25MB`)
 11. Accepted valid documents (`PDF`, `DOCX`, `TXT`) and audio (`MP3`, `WAV`, `M4A`)
 12. Resilient file deletion (does not crash when seed file has no physical disk artifact)
 13. Explore courses lists available un-enrolled courses
@@ -123,7 +123,7 @@ You can test all endpoints using the [VS Code REST Client](https://marketplace.v
 ### Course Materials
 - `GET /api/materials/:courseId` - List materials for a course (owner or enrolled)
 - `GET /api/materials/file/:materialId` - Stream / download material file with proper headers (owner or enrolled)
-- `POST /api/materials/:courseId/upload` - Upload file (multipart/form-data via Multer disk streaming; 50MB documents, 200MB audio)
+- `POST /api/materials/:courseId/upload` - Upload file (multipart/form-data via Multer disk streaming; 50MB documents, 25MB audio)
 - `DELETE /api/materials/:materialId` - Delete material record and underlying storage file (uploader or course owner only)
 
 ### AI & Document Intelligence (Phase 2 & Phase 3)
@@ -144,18 +144,16 @@ You can test all endpoints using the [VS Code REST Client](https://marketplace.v
 
 ## Verification & Test Suites
 
-### Phase 1: Authentication & Core LMS API
+Run all automated verification test suites across the monorepo:
 ```bash
+npm test
+```
+Or run the individual test suites:
+```bash
+# Core API permissions, uploads, and explore course logic
 npm run test:api -w server
-```
 
-### Phase 2: pgvector RAG, Embeddings & Summaries
-```bash
-npm run test:phase2 -w server
-```
-
-### Phase 3: AI Tutor, Quizzes, Study Plans, Assignments & Progress
-```bash
+# Phase 3 AI features: Quizzes, Student Sanitization, Attempt Scoring, and Analytics
 npm run test:phase3 -w server
 ```
 
@@ -175,7 +173,7 @@ npm run test:phase3 -w server
   - Owner controls: Edit course dialog, delete course confirmation dialog.
   - Interactive Material Uploader: Drag-and-drop zone, file size and type validation, real XHR upload progress bar, automatic 4s polling for pending jobs with 2-minute cutoff.
   - Material List: File icons by type, formatted size and timestamp, status badge (`PENDING`, `READY`, `FAILED`), failure reason tooltip/label, download as blob, retry button for failed jobs, and delete with confirmation.
-  - **Summary Dialog**: Instant AI summary generation with caching for `READY` materials.
+  - **Inline Document Summary**: Instant AI summary generation with inline expand/collapse, loading skeletons, error retry, and cached status for `READY` materials.
   - **PDF Chat Tab**: Interactive RAG chatbot scoped to all course materials or a specific file, with real-time question length counter (500 char guardrail), source snippet citations, and empty/error states.
   - **AI Tutor Tab**: Patient-teacher conversational interface with step-by-step reasoning, real-world examples, source badges (`[Course Material]` vs `[General Knowledge]`), and local browser-persisted chat history.
   - **Quizzes Tab**: Generate customizable multiple-choice quizzes (3-10 questions), preview existing quizzes with question and attempt counts, take quizzes with timed/unanswered validation, and view post-submission score review with detailed per-question explanations.
@@ -184,6 +182,8 @@ npm run test:phase3 -w server
 
 ---
 
-## Future Roadmap
+## Architecture Highlights
 
-- **Phase 4**: Audio Transcription (Whisper integration for lecture recordings) and asynchronous job queues (BullMQ / Redis).
+- **Lecture Audio Transcription**: Integrated with Groq Cloud's ultra-fast Whisper endpoint (`whisper-large-v3-turbo`) for automatic speech-to-text transcription of audio lectures under 25MB directly into RAG search chunks.
+- **Theme Switching**: Full Light, Dark, and System theme switching powered by `next-themes` and `@clerk/themes`.
+- **Markdown & Code Rendering**: Real-time markdown rendering using `react-markdown`, `remark-gfm`, and `@tailwindcss/typography` across all AI summaries, chat, tutor, and quiz explanations.

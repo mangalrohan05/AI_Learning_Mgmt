@@ -153,11 +153,10 @@ export function CourseTutor({ courseId }: { courseId: string }) {
               className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                  isUser
-                    ? 'bg-primary text-primary-foreground rounded-br-none'
-                    : 'bg-card border border-border/80 text-foreground rounded-bl-none shadow-sm'
-                }`}
+                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${isUser
+                  ? 'bg-primary text-primary-foreground rounded-br-none'
+                  : 'bg-card border border-border/80 text-foreground rounded-bl-none shadow-sm'
+                  }`}
               >
                 {!isUser && (
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-primary mb-1">

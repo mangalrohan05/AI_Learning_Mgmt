@@ -20,10 +20,46 @@ async function main() {
 
   const userId = course.ownerId;
   const userClerkId = course.owner.clerkId;
+  let tempMaterialId: string | null = null;
   let testQuizId: string | null = null;
   let httpServer: Server | null = null;
 
   try {
+    // Create a temporary material with sample chunks for self-contained testing
+    const tempMaterial = await prisma.material.create({
+      data: {
+        courseId: course.id,
+        uploaderId: userId,
+        name: 'Machine Learning Fundamentals.txt',
+        type: 'TXT',
+        status: 'READY',
+        storagePath: 'uploads/temp_phase3_ml_guide.txt',
+        mimeType: 'text/plain',
+        size: 1024,
+      },
+    });
+    tempMaterialId = tempMaterial.id;
+
+    await prisma.documentChunk.createMany({
+      data: [
+        {
+          materialId: tempMaterial.id,
+          chunkIndex: 0,
+          content: 'Supervised learning algorithms build a mathematical model of a set of data that contains both the inputs and the desired outputs. Common algorithms include linear regression, logistic regression, decision trees, and support vector machines.',
+        },
+        {
+          materialId: tempMaterial.id,
+          chunkIndex: 1,
+          content: 'Unsupervised learning algorithms take a set of data that contains only inputs, and find structure in the data, like grouping or clustering of data points. Examples include K-Means clustering and Principal Component Analysis.',
+        },
+        {
+          materialId: tempMaterial.id,
+          chunkIndex: 2,
+          content: 'Gradient descent is an optimization algorithm used to minimize cost functions in machine learning models. Learning rate is a hyperparameter that controls how much to change the model in response to the estimated error each time the model weights are updated.',
+        },
+      ],
+    });
+
     // Start local Express server for real HTTP route testing
     httpServer = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));
@@ -189,6 +225,10 @@ async function main() {
     if (testQuizId) {
       await prisma.quizAttempt.deleteMany({ where: { quizId: testQuizId } });
       await prisma.quiz.delete({ where: { id: testQuizId } }).catch(() => {});
+    }
+    if (tempMaterialId) {
+      await prisma.documentChunk.deleteMany({ where: { materialId: tempMaterialId } }).catch(() => {});
+      await prisma.material.delete({ where: { id: tempMaterialId } }).catch(() => {});
     }
     await prisma.$disconnect();
     console.log('✅ Cleanup complete. Seed data preserved.');
