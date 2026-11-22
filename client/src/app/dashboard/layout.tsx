@@ -33,6 +33,7 @@ export default function DashboardLayout({
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Close navigation menu"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -52,6 +53,7 @@ export default function DashboardLayout({
               variant="ghost"
               size="icon"
               className="md:hidden"
+              aria-label="Open navigation menu"
               onClick={() => setMobileMenuOpen(true)}
             >
               <Menu className="h-5 w-5" />

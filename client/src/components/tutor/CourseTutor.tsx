@@ -254,6 +254,7 @@ export function CourseTutor({ courseId }: { courseId: string }) {
           <Button
             type="submit"
             size="icon"
+            aria-label="Send question to tutor"
             disabled={!question.trim() || loading}
             className="absolute right-2 bottom-2 h-8 w-8 rounded-lg"
           >

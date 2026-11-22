@@ -18,6 +18,8 @@ import {
   ArrowRight,
   ShieldCheck,
   BookOpen,
+  Headphones,
+  Award,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -109,7 +111,11 @@ export default function LandingPage() {
             </span>
             <span className="flex items-center gap-1.5">
               <CheckCircle className="h-3.5 w-3.5 text-primary" />
-              PostgreSQL + Neon Lakebase
+              PostgreSQL + Neon pgvector
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-primary" />
+              Gemini 1.5 Flash + Groq Whisper
             </span>
             <span className="flex items-center gap-1.5">
               <CheckCircle className="h-3.5 w-3.5 text-primary" />
@@ -122,14 +128,14 @@ export default function LandingPage() {
       {/* Feature Showcase Grid */}
       <section className="py-16 px-4 max-w-6xl mx-auto space-y-12 border-t border-border/60">
         <div className="text-center space-y-2">
-          <Badge variant="secondary">Core Architecture</Badge>
+          <Badge variant="secondary">Platform Capabilities</Badge>
           <h2 className="text-3xl font-bold tracking-tight">Built for Students & Instructors</h2>
           <p className="text-muted-foreground max-w-xl mx-auto text-sm">
             Everything you need to organize your college coursework and accelerate exam revision.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="border-border hover:border-primary/50 transition-colors">
             <CardHeader className="pb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-2">
@@ -137,7 +143,7 @@ export default function LandingPage() {
               </div>
               <CardTitle className="text-base">PDF Chat & RAG</CardTitle>
               <CardDescription className="text-xs">
-                Upload PDFs and text notes. Ask questions and get answers grounded with source page citations.
+                Upload PDFs, DOCX, and text notes. Ask questions and get answers grounded with source page citations.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -174,6 +180,30 @@ export default function LandingPage() {
               <CardTitle className="text-base">Smart Study Planner</CardTitle>
               <CardDescription className="text-xs">
                 Dynamic revision roadmaps that prioritize difficult topics and pace your study schedule before tests.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-border hover:border-primary/50 transition-colors">
+            <CardHeader className="pb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-2">
+                <Headphones className="h-5 w-5" />
+              </div>
+              <CardTitle className="text-base">Lecture Audio Transcription</CardTitle>
+              <CardDescription className="text-xs">
+                Upload audio recordings up to 25 MB. Groq Whisper automatically transcribes speech into indexed study material.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-border hover:border-primary/50 transition-colors">
+            <CardHeader className="pb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-2">
+                <Award className="h-5 w-5" />
+              </div>
+              <CardTitle className="text-base">Automated Assignment Grading</CardTitle>
+              <CardDescription className="text-xs">
+                Submit assignments as text or files. Receive instant rubric evaluations, strengths, and actionable feedback.
               </CardDescription>
             </CardHeader>
           </Card>
