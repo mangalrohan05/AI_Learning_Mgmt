@@ -1,0 +1,36 @@
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+
+# ── Build outputs ─────────────────────────────────────────────
+dist/
+.next/
+out/
+
+# ── Environment (never commit real secrets) ───────────────────
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+!.env.local.example
+!*.env.example
+!*.env.local.example
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Local file uploads (dev only) ────────────────────────────
+server/uploads/*
+!server/uploads/.gitkeep
+
+# ── IDE & Tools ───────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.neon
+.clerk

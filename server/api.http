@@ -1,0 +1,181 @@
+### ==========================================================================
+### AI Learning Management System - API Tests
+### ==========================================================================
+### How to obtain a Clerk Bearer Token for testing:
+### 1. Run `npm run dev` and open http://localhost:3000 in your browser.
+### 2. Sign in or sign up.
+### 3. Open your browser Developer Tools Console (F12) and run:
+###    await window.Clerk.session.getToken()
+### 4. Copy the resulting JWT string and paste it into @token below.
+### ==========================================================================
+
+@baseUrl = http://localhost:8000
+@token = YOUR_CLERK_SESSION_TOKEN_HERE
+
+### 1. Health Check (Unauthenticated)
+GET {{baseUrl}}/health
+
+### 2. Auth - Get Current User Profile
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### 3. Courses - List Courses (Owned & Enrolled)
+GET {{baseUrl}}/api/courses
+Authorization: Bearer {{token}}
+
+### 4. Courses - Create Course
+# @name createCourse
+POST {{baseUrl}}/api/courses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Machine Learning Fundamentals",
+  "description": "Introduction to Supervised and Unsupervised Learning"
+}
+
+### 5. Courses - Explore Courses (Not Owned & Not Enrolled)
+GET {{baseUrl}}/api/courses/explore
+Authorization: Bearer {{token}}
+
+### 6. Courses - Get Course Details by ID
+# Replace :id with a valid course ID (e.g. seed_course_ml_01 or created above)
+GET {{baseUrl}}/api/courses/seed_course_ml_01
+Authorization: Bearer {{token}}
+
+### 7. Courses - Update Course (Owner Only)
+PUT {{baseUrl}}/api/courses/seed_course_ml_01
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Updated Course Title",
+  "description": "Updated course description"
+}
+
+### 8. Courses - Enroll in Course
+# Non-owner user can enroll; duplicate enrollment returns 400
+POST {{baseUrl}}/api/courses/seed_course_ds_01/enroll
+Authorization: Bearer {{token}}
+
+### 9. Courses - Delete Course (Owner Only)
+DELETE {{baseUrl}}/api/courses/seed_course_ml_01
+Authorization: Bearer {{token}}
+
+### 10. Materials - List Materials for a Course (Owner or Enrolled)
+GET {{baseUrl}}/api/materials/seed_course_ml_01
+Authorization: Bearer {{token}}
+
+### 11. Materials - Download/Stream Stored File (Owner or Enrolled)
+# Replace :materialId with a valid material ID (e.g. seed_mat_01)
+GET {{baseUrl}}/api/materials/file/seed_mat_01
+Authorization: Bearer {{token}}
+
+### 12. Materials - Upload Document (PDF / DOCX / TXT <= 50MB, Audio <= 200MB)
+POST {{baseUrl}}/api/materials/seed_course_ml_01/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="sample_lecture_notes.txt"
+Content-Type: text/plain
+
+Lecture 1: Introduction to Machine Learning algorithms and supervised learning models.
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### 13. Materials - Delete Material (Uploader or Course Owner)
+# Replace :materialId with a valid material ID (e.g. seed_mat_01)
+DELETE {{baseUrl}}/api/materials/seed_mat_01
+Authorization: Bearer {{token}}
+
+### 14. AI - Summarize Material (Generates & caches summary)
+# Replace :materialId with a READY material ID
+POST {{baseUrl}}/api/materials/seed_mat_01/summary
+Authorization: Bearer {{token}}
+
+### 15. AI - Course PDF Chat (RAG query across materials)
+POST {{baseUrl}}/api/courses/seed_course_ml_01/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "question": "What are the core topics covered in this course?",
+  "materialId": "seed_mat_01"
+}
+
+### 16. AI - Course AI Tutor (Interactive patient-teacher explanations)
+POST {{baseUrl}}/api/courses/seed_course_ml_01/tutor
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "question": "Can you explain supervised learning step by step with an example?",
+  "history": []
+}
+
+### 17. AI - Generate Quiz (3-10 questions from course or material)
+POST {{baseUrl}}/api/courses/seed_course_ml_01/quizzes/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numQuestions": 3,
+  "materialId": "seed_mat_01"
+}
+
+### 18. Quizzes - List Course Quizzes
+GET {{baseUrl}}/api/courses/seed_course_ml_01/quizzes
+Authorization: Bearer {{token}}
+
+### 19. Quizzes - Get Quiz Details (Questions without answers)
+# Replace :quizId with a valid quiz ID
+GET {{baseUrl}}/api/quizzes/seed_quiz_sample_01
+Authorization: Bearer {{token}}
+
+### 20. Quizzes - Submit Quiz Attempt
+# Replace :quizId with a valid quiz ID
+POST {{baseUrl}}/api/quizzes/seed_quiz_sample_01/attempt
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "answers": {
+    "0": "A",
+    "1": "B",
+    "2": "C"
+  }
+}
+
+### 21. AI - Generate / Replace Study Plan
+POST {{baseUrl}}/api/courses/seed_course_ml_01/study-plan
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "hoursPerWeek": 10,
+  "examDate": "2026-12-15",
+  "goal": "Score an A in the final exam"
+}
+
+### 22. Study Plan - Get Current Study Plan
+GET {{baseUrl}}/api/courses/seed_course_ml_01/study-plan
+Authorization: Bearer {{token}}
+
+### 23. AI - Submit Assignment for Evaluation (Text or File Upload)
+POST {{baseUrl}}/api/courses/seed_course_ml_01/assignments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Machine Learning Ethics Essay",
+  "text": "Machine learning ethics involves addressing biases in training data, ensuring algorithmic transparency, and protecting user privacy in automated decision-making pipelines."
+}
+
+### 24. Assignments - List User Course Assignments
+GET {{baseUrl}}/api/courses/seed_course_ml_01/assignments
+Authorization: Bearer {{token}}
+
+### 25. Progress - Student Analytics & Dashboard Metrics
+GET {{baseUrl}}/api/progress
+Authorization: Bearer {{token}}
+

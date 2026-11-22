@@ -1,0 +1,196 @@
+// This is your Prisma schema file.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Pooled connection — used by the Express server at runtime
+  url       = env("DATABASE_URL")
+  // Direct (non-pooled) connection — used by Prisma CLI for migrations
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Enums ─────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+}
+
+enum MaterialType {
+  PDF
+  DOCX
+  TXT
+  AUDIO
+}
+
+enum MaterialStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+// ── Core models ───────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedCourses Course[]      @relation("CourseOwner")
+  enrollments  Enrollment[]
+  materials    Material[]    @relation("MaterialUploader")
+  quizAttempts QuizAttempt[]
+  studyPlans   StudyPlan[]
+  assignments  Assignment[]
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  // Any authenticated user can own a course (no INSTRUCTOR gate in Phase 1)
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User         @relation("CourseOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  materials   Material[]
+  quizzes     Quiz[]
+  studyPlans  StudyPlan[]
+  assignments Assignment[]
+
+  @@index([ownerId])
+}
+
+// Join table: one row per (student, course) pair
+model Enrollment {
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  enrolledAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+model Material {
+  id          String         @id @default(cuid())
+  courseId    String
+  uploaderId  String
+  name        String          // original file name shown to users
+  type        MaterialType
+  status      MaterialStatus  @default(PENDING)
+  storagePath String          // relative path on disk (swappable to S3 key in Phase 5)
+  mimeType    String
+  size        Int             // bytes
+  summary       String?         // AI-generated summary
+  failureReason String?         // Reason explaining FAILED status (e.g. image-only PDF)
+  transcript    String?         // Full audio transcript (from Whisper)
+  createdAt     DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploader       User            @relation("MaterialUploader", fields: [uploaderId], references: [id])
+  documentChunks DocumentChunk[]
+
+  @@index([courseId])
+  @@index([uploaderId])
+}
+
+// ── Phase 2: Document Chunks & Vector Embeddings ──────────────
+
+model DocumentChunk {
+  id         String                      @id @default(cuid())
+  materialId String
+  content    String                      // raw text of this chunk
+  chunkIndex Int                         // order within the material
+  metadata   Json?                       // e.g. { page: 3, section: "Introduction" }
+  embedding  Unsupported("vector(768)")? // 768-dim embeddings from text-embedding-004
+  createdAt  DateTime                    @default(now())
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+}
+
+// ── Phase 3 placeholders ──────────────────────────────────────
+
+model Quiz {
+  id        String   @id @default(cuid())
+  courseId  String
+  title     String
+  // Structured array of questions; schema defined in Phase 3
+  questions Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course   Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  attempts QuizAttempt[]
+
+  @@index([courseId])
+}
+
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  quizId      String
+  studentId   String
+  answers     Json      @default("[]")
+  score       Float?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([studentId])
+}
+
+// ── Phase 3 & 4 Models ────────────────────────────────────────
+
+model StudyPlan {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  content   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model Assignment {
+  id         String   @id @default(cuid())
+  courseId   String
+  studentId  String
+  title      String   @default("Untitled Assignment")
+  content    String   // student's submission text
+  aiFeedback String?  // AI evaluation feedback
+  score      Float?   // Score out of 10
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([studentId])
+}
