@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function DashboardLayout({
   children,
@@ -61,6 +62,7 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <UserButton />
           </div>
         </header>

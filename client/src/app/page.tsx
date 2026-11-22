@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
   GraduationCap,
   Sparkles,
@@ -35,6 +36,7 @@ export default function LandingPage() {
         </div>
 
         <nav className="flex items-center gap-3">
+          <ThemeToggle />
           <Suspense fallback={<div className="h-8 w-24" />}>
             <Show when="signed-out">
               <Button variant="ghost" size="sm" asChild>

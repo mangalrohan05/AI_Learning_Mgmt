@@ -223,16 +223,16 @@ export default function DashboardOverviewPage() {
               <div className="h-64 w-full pt-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={progress.recentScores} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis
                       dataKey="name"
-                      stroke="#888888"
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={11}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis
-                      stroke="#888888"
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={11}
                       tickLine={false}
                       axisLine={false}
