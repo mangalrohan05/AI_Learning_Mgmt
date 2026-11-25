@@ -21,7 +21,10 @@ async function main() {
   const userId = course.ownerId;
   const userClerkId = course.owner.clerkId;
   let tempMaterialId: string | null = null;
+  let extraNoteId: string | null = null;
+  let extraNotePath: string | null = null;
   let testQuizId: string | null = null;
+  let extraQuizId: string | null = null;
   let httpServer: Server | null = null;
 
   try {
@@ -218,18 +221,156 @@ async function main() {
     if (!thisCourseProgress) {
       throw new Error('Expected course completion entry for ML course');
     }
+    if (!Array.isArray(progress.recentCourses) || progress.recentCourses.length < 1) {
+      throw new Error('Expected progress.recentCourses to include user courses');
+    }
     console.log(`  ✅ Course "${thisCourseProgress.courseTitle}": ${thisCourseProgress.completedQuizzes}/${thisCourseProgress.totalQuizzes} quizzes (${thisCourseProgress.completionPercentage}%)`);
+
+    // 5. Test Latest Quiz Review & Quiz Count Bounds (1-25) & Delete Quiz
+    console.log('\n[Test 5] Testing quiz review endpoint, 1-25 question bounds, and delete...');
+    const reviewRes = await fetch(`${baseUrl}/api/quizzes/${generatedQuiz.id}/attempt/latest`, {
+      headers: { Authorization: `Bearer test_token_${userClerkId}` },
+    });
+    const reviewBody = (await reviewRes.json()) as any;
+    if (reviewRes.status !== 200 || !Array.isArray(reviewBody.results) || reviewBody.results.length !== 3) {
+      throw new Error(`Expected HTTP 200 with 3 review results, got ${reviewRes.status}: ${JSON.stringify(reviewBody)}`);
+    }
+    console.log(`  ✅ Verified GET /api/quizzes/:id/attempt/latest: score=${reviewBody.score}%`);
+
+    const tooManyRes = await fetch(`${baseUrl}/api/courses/${course.id}/quizzes/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer test_token_${userClerkId}`,
+      },
+      body: JSON.stringify({ numQuestions: 26 }),
+    });
+    if (tooManyRes.status !== 400) {
+      throw new Error(`Expected HTTP 400 for numQuestions=26, got ${tooManyRes.status}`);
+    }
+    console.log('  ✅ Verified numQuestions=26 rejected with HTTP 400');
+
+    const oneQRes = await fetch(`${baseUrl}/api/courses/${course.id}/quizzes/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer test_token_${userClerkId}`,
+      },
+      body: JSON.stringify({ numQuestions: 1, difficulty: 'easy', topic: 'Gradient Descent' }),
+    });
+    const oneQBody = (await oneQRes.json()) as any;
+    if (oneQRes.status !== 201 || oneQBody.totalQuestions !== 1) {
+      throw new Error(`Expected HTTP 201 with 1 question, got ${oneQRes.status}: ${JSON.stringify(oneQBody)}`);
+    }
+    extraQuizId = oneQBody.id;
+    console.log('  ✅ Verified numQuestions=1 with difficulty & topic accepted (HTTP 201)');
+
+    const delQuizRes = await fetch(`${baseUrl}/api/quizzes/${extraQuizId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer test_token_${userClerkId}` },
+    });
+    if (delQuizRes.status !== 200) {
+      throw new Error(`Expected HTTP 200 deleting quiz, got ${delQuizRes.status}`);
+    }
+    extraQuizId = null;
+    console.log('  ✅ Verified DELETE /api/quizzes/:id');
+
+    // 6. Test Manual Text Note Route & Unified Chat Tutor Mode
+    console.log('\n[Test 6] Testing POST /api/materials/:courseId/text and unified Ask AI Tutor mode...');
+    const textMatRes = await fetch(`${baseUrl}/api/materials/${course.id}/text`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer test_token_${userClerkId}`,
+      },
+      body: JSON.stringify({
+        title: 'Phase3 HTTP Note',
+        content: 'Gradient descent iteratively updates model parameters opposite the loss gradient.',
+      }),
+    });
+    const textMatBody = (await textMatRes.json()) as any;
+    if (textMatRes.status !== 201 || textMatBody.type !== 'TXT') {
+      throw new Error(`Expected HTTP 201 TXT material, got ${textMatRes.status}: ${JSON.stringify(textMatBody)}`);
+    }
+    extraNoteId = textMatBody.id;
+    extraNotePath = textMatBody.storagePath;
+    console.log(`  ✅ Verified POST /api/materials/:courseId/text created "${textMatBody.name}"`);
+
+    const tutorChatRes = await fetch(`${baseUrl}/api/courses/${course.id}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer test_token_${userClerkId}`,
+      },
+      body: JSON.stringify({
+        question: 'Explain gradient descent simply.',
+        mode: 'tutor',
+        history: [
+          { role: 'user', content: 'Hello tutor' },
+          { role: 'assistant', content: 'Hi! What would you like to study?' },
+        ],
+      }),
+    });
+    const tutorChatBody = (await tutorChatRes.json()) as any;
+    if (tutorChatRes.status !== 200 || !tutorChatBody.answer) {
+      throw new Error(`Expected HTTP 200 from unified Tutor mode chat, got ${tutorChatRes.status}: ${JSON.stringify(tutorChatBody)}`);
+    }
+    console.log(`  ✅ Verified POST /api/courses/:id/chat with mode="tutor" returned ${tutorChatBody.answer.length} chars`);
+
+    // 7. Test Assignment Multipart File Upload & Delete Assignment
+    console.log('\n[Test 7] Testing assignment multipart file upload & delete...');
+    const form = new FormData();
+    form.append('title', 'Phase3 Multipart Upload Essay');
+    form.append(
+      'file',
+      new Blob(
+        ['Supervised learning maps labeled inputs to outputs while gradient descent minimizes error.'],
+        { type: 'text/plain' }
+      ),
+      'assignment.txt'
+    );
+    const assignRes = await fetch(`${baseUrl}/api/courses/${course.id}/assignments`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer test_token_${userClerkId}` },
+      body: form,
+    });
+    const assignBody = (await assignRes.json()) as any;
+    if (assignRes.status !== 201 || typeof assignBody.score !== 'number' || !assignBody.content) {
+      throw new Error(`Expected HTTP 201 graded file assignment, got ${assignRes.status}: ${JSON.stringify(assignBody)}`);
+    }
+    console.log(`  ✅ Verified file assignment evaluated cleanly: score=${assignBody.score}/10`);
+
+    const delAssignRes = await fetch(`${baseUrl}/api/courses/${course.id}/assignments/${assignBody.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer test_token_${userClerkId}` },
+    });
+    if (delAssignRes.status !== 200) {
+      throw new Error(`Expected HTTP 200 deleting assignment, got ${delAssignRes.status}`);
+    }
+    console.log('  ✅ Verified DELETE /api/courses/:id/assignments/:assignmentId');
 
     console.log('\n🎉 ALL PHASE 3 VERIFICATION CHECKS PASSED SUCCESSFULLY!');
   } finally {
-    // 5. Cleanup
+    // Cleanup
     console.log('\n🧹 Cleaning up Phase 3 test artifacts...');
     if (httpServer) {
       await new Promise((resolve) => httpServer?.close(resolve));
     }
+    if (extraQuizId) {
+      await prisma.quizAttempt.deleteMany({ where: { quizId: extraQuizId } });
+      await prisma.quiz.delete({ where: { id: extraQuizId } }).catch(() => {});
+    }
     if (testQuizId) {
       await prisma.quizAttempt.deleteMany({ where: { quizId: testQuizId } });
       await prisma.quiz.delete({ where: { id: testQuizId } }).catch(() => {});
+    }
+    if (extraNotePath) {
+      const { storageProvider } = await import('../src/services/storage/localStorageProvider');
+      await storageProvider.delete(extraNotePath).catch(() => {});
+    }
+    if (extraNoteId) {
+      await prisma.documentChunk.deleteMany({ where: { materialId: extraNoteId } }).catch(() => {});
+      await prisma.material.delete({ where: { id: extraNoteId } }).catch(() => {});
     }
     if (tempMaterialId) {
       await prisma.documentChunk.deleteMany({ where: { materialId: tempMaterialId } }).catch(() => {});

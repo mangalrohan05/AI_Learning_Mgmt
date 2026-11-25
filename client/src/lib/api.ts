@@ -100,6 +100,7 @@ export interface Material {
   mimeType: string;
   size: number;
   summary?: string | null;
+  transcript?: string | null;
   failureReason?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -115,6 +116,7 @@ export interface Course {
   title: string;
   description: string | null;
   ownerId?: string;
+  isOwner?: boolean;
   owner?: CourseOwner;
   createdAt?: string;
   updatedAt?: string;
@@ -195,9 +197,29 @@ export const api = {
       }
     ),
 
+  unenrollCourse: (token: string, courseId: string) =>
+    apiClient<{ success: boolean; message: string }>(
+      `/api/courses/${courseId}/enroll`,
+      {
+        method: 'DELETE',
+        token,
+      }
+    ),
+
   // Materials
   getMaterials: (token: string, courseId: string) =>
     apiClient<Material[]>(`/api/materials/${courseId}`, { token }),
+
+  createTextMaterial: (
+    token: string,
+    courseId: string,
+    data: { title: string; content: string }
+  ) =>
+    apiClient<Material>(`/api/materials/${courseId}/text`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    }),
 
   deleteMaterial: (token: string, materialId: string) =>
     apiClient<{ success: boolean; message: string }>(`/api/materials/${materialId}`, {
@@ -235,27 +257,34 @@ export const api = {
     window.URL.revokeObjectURL(blobUrl);
   },
 
-  // AI & RAG (Phase 2)
+  // AI & Ask AI (unified RAG notes mode + guided tutor mode)
   chatCourse: (
     token: string,
     courseId: string,
-    data: { question: string; materialId?: string }
+    data: {
+      question: string;
+      materialId?: string;
+      mode?: 'strict' | 'tutor';
+      history?: { role: 'user' | 'assistant'; content: string }[];
+    }
   ) =>
     apiClient<{
       answer: string;
       sources: { materialName: string; snippet: string }[];
+      cached?: boolean;
     }>(`/api/courses/${courseId}/chat`, {
       method: 'POST',
       token,
       body: JSON.stringify(data),
     }),
 
-  summarizeMaterial: (token: string, materialId: string) =>
+  summarizeMaterial: (token: string, materialId: string, force = false) =>
     apiClient<{ summary: string; cached: boolean }>(
       `/api/materials/${materialId}/summary`,
       {
         method: 'POST',
         token,
+        body: JSON.stringify({ force }),
       }
     ),
 
@@ -268,29 +297,16 @@ export const api = {
       }
     ),
 
-  // ── Phase 3: AI Tutor ───────────────────────────────────────
-  askTutor: (
-    token: string,
-    courseId: string,
-    data: {
-      question: string;
-      history?: { role: 'user' | 'assistant'; content: string }[];
-    }
-  ) =>
-    apiClient<{
-      answer: string;
-      sources: { materialName: string; snippet: string }[];
-    }>(`/api/courses/${courseId}/tutor`, {
-      method: 'POST',
-      token,
-      body: JSON.stringify(data),
-    }),
-
   // ── Phase 3: Quizzes ────────────────────────────────────────
   generateQuiz: (
     token: string,
     courseId: string,
-    data: { materialId?: string; numQuestions?: number }
+    data: {
+      materialId?: string;
+      numQuestions?: number;
+      difficulty?: 'easy' | 'medium' | 'hard';
+      topic?: string;
+    }
   ) =>
     apiClient<{
       id: string;
@@ -356,6 +372,32 @@ export const api = {
       method: 'POST',
       token,
       body: JSON.stringify({ answers }),
+    }),
+
+  getLatestQuizReview: (token: string, quizId: string) =>
+    apiClient<{
+      attemptId: string;
+      quizId: string;
+      quizTitle: string;
+      score: number;
+      totalQuestions: number;
+      correctCount: number;
+      results: {
+        questionIndex: number;
+        question: string;
+        options: string[];
+        selectedAnswer: number;
+        correctAnswer: number;
+        isCorrect: boolean;
+        explanation: string;
+      }[];
+      completedAt: string;
+    }>(`/api/quizzes/${quizId}/attempt/latest`, { token }),
+
+  deleteQuiz: (token: string, quizId: string) =>
+    apiClient<{ success: boolean; message: string }>(`/api/quizzes/${quizId}`, {
+      method: 'DELETE',
+      token,
     }),
 
   // ── Phase 3: Study Planner ──────────────────────────────────
@@ -449,6 +491,7 @@ export const api = {
         courseId: string;
         studentId: string;
         title: string;
+        content?: string;
         score: number;
         feedback: {
           score: number;
@@ -460,6 +503,15 @@ export const api = {
         createdAt: string;
       }[]
     >(`/api/courses/${courseId}/assignments`, { token }),
+
+  deleteAssignment: (token: string, courseId: string, assignmentId: string) =>
+    apiClient<{ success: boolean; message: string }>(
+      `/api/courses/${courseId}/assignments/${assignmentId}`,
+      {
+        method: 'DELETE',
+        token,
+      }
+    ),
 
   // ── Phase 3: Progress Analytics ─────────────────────────────
   getUserProgress: (token: string) =>
@@ -479,11 +531,21 @@ export const api = {
         score: number;
         date: string;
       }[];
+      recentCourses?: {
+        id: string;
+        title: string;
+        description: string | null;
+        isOwner: boolean;
+        materialsCount: number;
+        quizzesCount: number;
+      }[];
       courseProgress: {
         courseId: string;
         courseTitle: string;
         totalQuizzes: number;
         completedQuizzes: number;
+        materialsCount?: number;
+        assignmentsCount?: number;
         completionPercentage: number;
       }[];
     }>('/api/progress', { token }),

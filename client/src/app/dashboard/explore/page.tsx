@@ -5,10 +5,11 @@ import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { api, ExploreCourse } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Compass, GraduationCap, CheckCircle2, AlertCircle, BookOpen, Loader2 } from 'lucide-react';
+import { Compass, GraduationCap, CheckCircle2, AlertCircle, BookOpen, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ExploreCoursesPage() {
@@ -17,6 +18,7 @@ export default function ExploreCoursesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   async function loadExploreCourses() {
     setLoading(true);
@@ -56,6 +58,16 @@ export default function ExploreCoursesPage() {
     }
   }
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredCourses = normalizedQuery
+    ? courses.filter(
+        (c) =>
+          c.title.toLowerCase().includes(normalizedQuery) ||
+          (c.description && c.description.toLowerCase().includes(normalizedQuery)) ||
+          (c.owner?.name && c.owner.name.toLowerCase().includes(normalizedQuery))
+      )
+    : courses;
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -77,6 +89,19 @@ export default function ExploreCoursesPage() {
           </Link>
         </Button>
       </div>
+
+      {/* Search Bar */}
+      {!loading && courses.length > 0 && (
+        <div className="relative max-w-md">
+          <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Input
+            placeholder="Search courses by title, description, or instructor..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+      )}
 
       {/* Error state */}
       {error && (
@@ -116,9 +141,19 @@ export default function ExploreCoursesPage() {
             <Link href="/dashboard/courses">Go to My Courses</Link>
           </Button>
         </div>
+      ) : filteredCourses.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-14 px-4 text-center">
+          <p className="text-sm font-semibold">No courses match &ldquo;{searchQuery.trim()}&rdquo;</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">
+            Try a different keyword or clear the search filter.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setSearchQuery('')}>
+            Clear search
+          </Button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {courses.map((course) => {
+          {filteredCourses.map((course) => {
             const isEnrolling = enrollingId === course.id;
             return (
               <Card

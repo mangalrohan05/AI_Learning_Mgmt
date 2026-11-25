@@ -59,6 +59,38 @@ export class LocalStorageProvider {
     };
   }
 
+  /**
+   * Saves an in-memory buffer directly to disk using the same sanitized naming scheme.
+   */
+  public async saveBuffer(
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string
+  ): Promise<StorageFile> {
+    await this.ensureDir();
+
+    const ext = path.extname(originalName).toLowerCase() || '.txt';
+    const baseName = path
+      .basename(originalName, ext)
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 50) || 'note';
+
+    const randomSuffix = crypto.randomBytes(8).toString('hex');
+    const storedFileName = `${Date.now()}_${randomSuffix}_${baseName}${ext}`;
+    const destinationPath = path.join(this.uploadDir, storedFileName);
+
+    await fs.writeFile(destinationPath, buffer);
+
+    const relativeStoragePath = path.join(env.UPLOAD_DIR, storedFileName).replace(/\\/g, '/');
+
+    return {
+      originalName: `${baseName}${ext}`,
+      storagePath: relativeStoragePath,
+      mimeType,
+      size: buffer.length,
+    };
+  }
+
   public async delete(storagePath: string): Promise<void> {
     try {
       const fileName = path.basename(storagePath);

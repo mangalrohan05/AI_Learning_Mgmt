@@ -5,11 +5,27 @@ import { generateQuizQuestions, QuizQuestion } from '../lib/ai';
 export interface GenerateQuizInput {
   materialId?: string;
   numQuestions?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  topic?: string;
+}
+
+/**
+ * Evenly samples up to `maxCount` items across an ordered array so early, middle,
+ * and late sections of a document or course are represented.
+ */
+function sampleEvenly<T>(items: T[], maxCount: number): T[] {
+  if (items.length <= maxCount) return items;
+  const sampled: T[] = [];
+  const step = (items.length - 1) / (maxCount - 1);
+  for (let i = 0; i < maxCount; i++) {
+    sampled.push(items[Math.round(i * step)]!);
+  }
+  return sampled;
 }
 
 export class QuizService {
   /**
-   * Generates multiple-choice questions from course materials via Google Gemini
+   * Generates multiple-choice questions (1-25) from course materials via Google Gemini
    */
   public async generateQuiz(
     courseId: string,
@@ -57,7 +73,7 @@ export class QuizService {
       materialName = targetMaterial.name;
     }
 
-    // 3. Fetch chunks for quiz generation
+    // 3. Fetch chunks ordered across the full material/course and sample evenly
     const whereClause: any = {
       material: {
         courseId,
@@ -68,31 +84,39 @@ export class QuizService {
       whereClause.materialId = input.materialId;
     }
 
-    const chunks = await prisma.documentChunk.findMany({
+    const allChunks = await prisma.documentChunk.findMany({
       where: whereClause,
+      orderBy: [{ materialId: 'asc' }, { chunkIndex: 'asc' }],
       select: { content: true },
-      take: 20,
     });
 
-    if (chunks.length === 0) {
+    if (allChunks.length === 0) {
       throw new AppError(
         400,
         'No processed materials available in this course to generate quiz questions'
       );
     }
 
-    const numQuestions = Math.min(Math.max(input.numQuestions || 5, 3), 10);
-    const contextTexts = chunks.map((c) => c.content);
+    const sampledChunks = sampleEvenly(allChunks, 35);
+    const numQuestions = Math.min(Math.max(input.numQuestions || 5, 1), 25);
+    const contextTexts = sampledChunks.map((c) => c.content);
 
     // 4. Generate structured questions via Gemini
-    const questions = await generateQuizQuestions(contextTexts, numQuestions);
+    const questions = await generateQuizQuestions(contextTexts, numQuestions, {
+      difficulty: input.difficulty,
+      topic: input.topic,
+    });
 
     // 5. Store Quiz in DB
-    const quizTitle = `${materialName.replace(/\.[^/.]+$/, '')} Practice Quiz`;
+    const baseName = materialName.replace(/\.[^/.]+$/, '');
+    const quizTitle = input.topic?.trim()
+      ? `${baseName}: ${input.topic.trim()}`
+      : `${baseName} Practice Quiz`;
+
     const quiz = await prisma.quiz.create({
       data: {
         courseId,
-        title: quizTitle,
+        title: quizTitle.slice(0, 120),
         questions: questions as any,
       },
       include: {
@@ -201,6 +225,72 @@ export class QuizService {
   }
 
   /**
+   * Returns the full graded review breakdown for the user's latest completed attempt
+   */
+  public async getLatestAttemptReview(quizId: string, userId: string) {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        course: {
+          include: {
+            enrollments: { where: { userId } },
+          },
+        },
+      },
+    });
+
+    if (!quiz) {
+      throw new AppError(404, 'Quiz not found');
+    }
+
+    const isOwner = quiz.course.ownerId === userId;
+    const isEnrolled = quiz.course.enrollments.length > 0;
+    if (!isOwner && !isEnrolled) {
+      throw new AppError(403, 'Access denied');
+    }
+
+    const latestAttempt = await prisma.quizAttempt.findFirst({
+      where: { quizId, studentId: userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!latestAttempt) {
+      throw new AppError(404, 'No attempt found for this quiz');
+    }
+
+    const questions = (quiz.questions as unknown as QuizQuestion[]) || [];
+    const answers = (latestAttempt.answers as number[]) || [];
+
+    let correctCount = 0;
+    const breakdown = questions.map((q, i) => {
+      const selectedAnswer = answers[i] ?? -1;
+      const isCorrect = selectedAnswer !== -1 && selectedAnswer === q.correctAnswer;
+      if (isCorrect) correctCount++;
+
+      return {
+        questionIndex: i,
+        question: q.question,
+        options: q.options,
+        selectedAnswer,
+        correctAnswer: q.correctAnswer,
+        isCorrect,
+        explanation: q.explanation,
+      };
+    });
+
+    return {
+      attemptId: latestAttempt.id,
+      quizId,
+      quizTitle: quiz.title,
+      score: Math.round(latestAttempt.score ?? 0),
+      totalQuestions: questions.length,
+      correctCount,
+      results: breakdown,
+      completedAt: latestAttempt.completedAt || latestAttempt.createdAt,
+    };
+  }
+
+  /**
    * Submits a quiz attempt, computes score on the server, stores attempt,
    * and returns full score breakdown with correct answers and explanations.
    */
@@ -293,6 +383,27 @@ export class QuizService {
       results: breakdown,
       completedAt: attempt.completedAt,
     };
+  }
+
+  /**
+   * Deletes a quiz (course owner only)
+   */
+  public async deleteQuiz(quizId: string, userId: string) {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: { course: { select: { ownerId: true } } },
+    });
+
+    if (!quiz) {
+      throw new AppError(404, 'Quiz not found');
+    }
+
+    if (quiz.course.ownerId !== userId) {
+      throw new AppError(403, 'Access denied: Only the course owner can delete quizzes');
+    }
+
+    await prisma.quiz.delete({ where: { id: quizId } });
+    return { success: true, message: 'Quiz deleted' };
   }
 }
 

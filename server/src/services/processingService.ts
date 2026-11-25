@@ -86,8 +86,17 @@ export class ProcessingService {
     }
 
     try {
-      // 1. Read file buffer from storage
-      const buffer = await storageProvider.read(material.storagePath);
+      // 1. Read file buffer from storage (with transcript fallback for TXT notes on ephemeral disks)
+      let buffer: Buffer;
+      try {
+        buffer = await storageProvider.read(material.storagePath);
+      } catch (readErr) {
+        if (material.type === 'TXT' && material.transcript) {
+          buffer = Buffer.from(material.transcript, 'utf-8');
+        } else {
+          throw readErr;
+        }
+      }
 
       // 2. Extract text according to file type
       let extractedText = '';
@@ -142,7 +151,7 @@ export class ProcessingService {
 
       // 3. Chunk text using LangChain RecursiveCharacterTextSplitter
       const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 1000,
+        chunkSize: 1500,
         chunkOverlap: 200,
       });
 
@@ -152,13 +161,13 @@ export class ProcessingService {
         console.warn(`[ProcessingService] Chunking produced 0 chunks for ${materialId}`);
         await prisma.material.update({
           where: { id: materialId },
-          data: { status: 'FAILED' },
+          data: { status: 'FAILED', failureReason: 'No readable chunks extracted' },
         });
         return;
       }
 
       // 4. Generate embeddings via Google Gemini
-      const MAX_CHUNKS = 50;
+      const MAX_CHUNKS = 100;
       const targetChunks = chunks.length > MAX_CHUNKS ? chunks.slice(0, MAX_CHUNKS) : chunks;
       if (chunks.length > MAX_CHUNKS) {
         console.log(
@@ -195,10 +204,10 @@ export class ProcessingService {
         );
       }
 
-      // 7. Mark material as READY
+      // 7. Mark material as READY and clear any prior failureReason
       await prisma.material.update({
         where: { id: materialId },
-        data: { status: 'READY' },
+        data: { status: 'READY', failureReason: null },
       });
 
       console.log(

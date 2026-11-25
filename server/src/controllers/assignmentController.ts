@@ -30,6 +30,19 @@ export class AssignmentController {
       next(error);
     }
   }
+
+  public async deleteAssignment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await assignmentService.deleteAssignment(
+        req.params.id as string,
+        req.params.assignmentId as string,
+        req.user!.id
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const assignmentController = new AssignmentController();

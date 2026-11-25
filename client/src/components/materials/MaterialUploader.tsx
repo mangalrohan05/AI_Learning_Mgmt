@@ -2,8 +2,11 @@
 
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   UploadCloud,
   File,
@@ -13,6 +16,7 @@ import {
   Loader2,
   FileText,
   Music,
+  PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,8 +61,12 @@ export function MaterialUploader({
   const { getToken } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [mode, setMode] = useState<'upload' | 'write'>('upload');
   const [isDragging, setIsDragging] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadingFile[]>([]);
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
 
   function validateFile(file: globalThis.File): string | null {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
@@ -182,9 +190,148 @@ export function MaterialUploader({
     setUploadQueue((prev) => prev.filter((item) => item.id !== id));
   }
 
+  async function handleSaveNote(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanTitle = noteTitle.trim();
+    const cleanContent = noteContent.trim();
+
+    if (!cleanTitle) {
+      toast.error('Please enter a title for your note.');
+      return;
+    }
+    if (cleanContent.length < 20) {
+      toast.error('Please write at least 20 characters so AI tools have context.');
+      return;
+    }
+
+    setSavingNote(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Please sign in to save notes');
+
+      await api.createTextMaterial(token, courseId, {
+        title: cleanTitle,
+        content: cleanContent,
+      });
+
+      toast.success(`Saved note "${cleanTitle}"`);
+      setNoteTitle('');
+      setNoteContent('');
+      onUploadSuccess();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save note');
+    } finally {
+      setSavingNote(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {/* Drop Zone */}
+      {/* Input Mode Switcher */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="inline-flex rounded-xl border border-border bg-card/70 p-1">
+          <button
+            type="button"
+            onClick={() => setMode('upload')}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              mode === 'upload'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            Upload File
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('write')}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              mode === 'write'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            Write Note
+          </button>
+        </div>
+
+        <span className="text-xs text-muted-foreground">
+          {mode === 'upload'
+            ? 'PDF, DOCX, TXT, or audio lecture recordings'
+            : 'Write or paste lecture notes directly'}
+        </span>
+      </div>
+
+      {mode === 'write' ? (
+        <Card className="border-border bg-card/60 shadow-sm">
+          <CardContent className="p-5">
+            <form onSubmit={handleSaveNote} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="note-title" className="text-xs font-medium block">
+                  Note Title <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="note-title"
+                  placeholder="e.g., Chapter 4: Memory Management & Virtual Memory"
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  maxLength={120}
+                  disabled={savingNote}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="note-content" className="text-xs font-medium block">
+                    Course Notes / Study Text <span className="text-destructive">*</span>
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    {noteContent.length.toLocaleString()} / 100,000 chars
+                  </span>
+                </div>
+                <Textarea
+                  id="note-content"
+                  placeholder="Write or paste lecture notes, formulas, outlines, reading passages, or coursework text here..."
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  rows={8}
+                  maxLength={100000}
+                  disabled={savingNote}
+                  className="bg-background/80 text-sm leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <p className="text-xs text-muted-foreground">
+                  Saved notes are indexed immediately for summaries, quizzes, Ask AI, and study plans.
+                </p>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={savingNote || !noteTitle.trim() || noteContent.trim().length < 20}
+                  className="gap-1.5 shrink-0"
+                >
+                  {savingNote ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <PenLine className="h-3.5 w-3.5" />
+                      Save Note
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Drop Zone */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -321,6 +468,8 @@ export function MaterialUploader({
             ))}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

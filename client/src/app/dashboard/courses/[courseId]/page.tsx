@@ -8,7 +8,6 @@ import { Course, Material, api } from '@/lib/api';
 import { MaterialUploader } from '@/components/materials/MaterialUploader';
 import { MaterialList } from '@/components/materials/MaterialList';
 import { CourseChat } from '@/components/chat/CourseChat';
-import { CourseTutor } from '@/components/tutor/CourseTutor';
 import { CourseQuizzes } from '@/components/quizzes/CourseQuizzes';
 import { CourseStudyPlan } from '@/components/study-plan/CourseStudyPlan';
 import { CourseAssignments } from '@/components/assignments/CourseAssignments';
@@ -34,12 +33,12 @@ import {
   FileText,
   Edit2,
   Trash2,
-  Sparkles,
   MessageSquare,
   HelpCircle,
   CalendarCheck,
   ShieldAlert,
   AlertCircle,
+  LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +56,7 @@ export default function CourseDetailPage({
 
   const [course, setCourse] = useState<Course | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [dbUserId, setDbUserId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -67,9 +67,11 @@ export default function CourseDetailPage({
   const [editDescription, setEditDescription] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
-  // Delete course dialog state
+  // Delete / Leave course dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [leavingCourse, setLeavingCourse] = useState(false);
 
   async function loadCourseDetails() {
     setLoading(true);
@@ -80,13 +82,15 @@ export default function CourseDetailPage({
       const token = await getToken();
       if (!token) return;
 
-      const [courseData, materialsData] = await Promise.all([
+      const [courseData, materialsData, meData] = await Promise.all([
         api.getCourse(token, courseId),
         api.getMaterials(token, courseId),
+        api.getMe(token).catch(() => null),
       ]);
 
       setCourse(courseData);
       setMaterials(materialsData);
+      if (meData?.id) setDbUserId(meData.id);
       setEditTitle(courseData.title);
       setEditDescription(courseData.description || '');
     } catch (err: any) {
@@ -156,11 +160,12 @@ export default function CourseDetailPage({
     return () => clearInterval(interval);
   }, [materials, courseId, getToken]);
 
-  const currentUserId = user?.id;
+  const currentUserId = dbUserId || user?.id;
   const isOwner =
-    course?.ownerId === currentUserId ||
-    course?.owner?.id === currentUserId ||
-    course?.owner?.email === user?.primaryEmailAddress?.emailAddress;
+    course?.isOwner ??
+    (course?.ownerId === currentUserId ||
+      course?.owner?.id === currentUserId ||
+      course?.owner?.email === user?.primaryEmailAddress?.emailAddress);
 
   async function handleUpdateCourse(e: React.FormEvent) {
     e.preventDefault();
@@ -201,6 +206,21 @@ export default function CourseDetailPage({
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete course');
       setDeletingCourse(false);
+    }
+  }
+
+  async function handleLeaveCourse() {
+    setLeavingCourse(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+
+      await api.unenrollCourse(token, courseId);
+      toast.success(`Left "${course?.title}"`);
+      router.push('/dashboard/courses');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to leave course');
+      setLeavingCourse(false);
     }
   }
 
@@ -309,8 +329,8 @@ export default function CourseDetailPage({
             </div>
           </div>
 
-          {/* Owner actions (Edit / Delete) */}
-          {isOwner && (
+          {/* Owner actions (Edit / Delete) or Student Leave Course */}
+          {isOwner ? (
             <div className="flex gap-2 shrink-0 self-start">
               <Button
                 variant="outline"
@@ -331,11 +351,23 @@ export default function CourseDetailPage({
                 Delete
               </Button>
             </div>
+          ) : (
+            <div className="flex gap-2 shrink-0 self-start">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
+                onClick={() => setLeaveDialogOpen(true)}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Leave Course
+              </Button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Feature Navigation Tabs */}
+      {/* Feature Navigation Tabs (Consolidated to 5 core tabs) */}
       <Tabs defaultValue="materials" className="space-y-6">
         <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-card/60 border border-border">
           <TabsTrigger value="materials" className="gap-2">
@@ -343,14 +375,9 @@ export default function CourseDetailPage({
             Materials ({materials.length})
           </TabsTrigger>
 
-          <TabsTrigger value="pdf-chat" className="gap-2">
+          <TabsTrigger value="ask-ai" className="gap-2">
             <MessageSquare className="h-4 w-4" />
-            PDF Chat
-          </TabsTrigger>
-
-          <TabsTrigger value="ai-tutor" className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            AI Tutor
+            Ask AI
           </TabsTrigger>
 
           <TabsTrigger value="quizzes" className="gap-2">
@@ -371,12 +398,12 @@ export default function CourseDetailPage({
 
         {/* Tab 1: Materials */}
         <TabsContent value="materials" className="space-y-6">
-          {/* Uploader Card */}
+          {/* Uploader / Write Note Card */}
           <div className="space-y-3">
             <div>
-              <h2 className="text-base font-semibold">Upload Material</h2>
+              <h2 className="text-base font-semibold">Add Course Material</h2>
               <p className="text-xs text-muted-foreground">
-                Add lecture notes, slides, documents, or audio recordings.
+                Upload PDFs, Word docs, text files, or audio recordings, or write notes manually.
               </p>
             </div>
             <MaterialUploader
@@ -391,7 +418,7 @@ export default function CourseDetailPage({
               <div>
                 <h2 className="text-base font-semibold">Course Materials</h2>
                 <p className="text-xs text-muted-foreground">
-                  Files and recordings shared in this course.
+                  Files, written notes, and recordings shared in this course.
                 </p>
               </div>
             </div>
@@ -406,27 +433,26 @@ export default function CourseDetailPage({
           </div>
         </TabsContent>
 
-        {/* Tab 2: PDF Chat */}
-        <TabsContent value="pdf-chat" className="space-y-6">
+        {/* Tab 2: Ask AI (Unified Notes Q&A + Tutor Mode) */}
+        <TabsContent value="ask-ai" className="space-y-6">
           <CourseChat courseId={courseId} materials={materials} />
         </TabsContent>
 
-        {/* Tab 3: AI Tutor */}
-        <TabsContent value="ai-tutor" className="space-y-6">
-          <CourseTutor courseId={courseId} />
-        </TabsContent>
-
-        {/* Tab 4: Quizzes */}
+        {/* Tab 3: Quizzes */}
         <TabsContent value="quizzes" className="space-y-6">
-          <CourseQuizzes courseId={courseId} materials={materials} />
+          <CourseQuizzes
+            courseId={courseId}
+            materials={materials}
+            isCourseOwner={Boolean(isOwner)}
+          />
         </TabsContent>
 
-        {/* Tab 5: Study Plan */}
+        {/* Tab 4: Study Plan */}
         <TabsContent value="study-plan" className="space-y-6">
           <CourseStudyPlan courseId={courseId} />
         </TabsContent>
 
-        {/* Tab 6: Assignments */}
+        {/* Tab 5: Assignments */}
         <TabsContent value="assignments" className="space-y-6">
           <CourseAssignments courseId={courseId} />
         </TabsContent>
@@ -487,6 +513,36 @@ export default function CourseDetailPage({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave Course Confirmation Dialog */}
+      <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Leave Course?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to unenroll from{' '}
+              <strong className="text-foreground">&ldquo;{course.title}&rdquo;</strong>?
+              You can rejoin anytime from Explore.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setLeaveDialogOpen(false)}
+              disabled={leavingCourse}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleLeaveCourse}
+              disabled={leavingCourse}
+            >
+              {leavingCourse ? 'Leaving...' : 'Leave Course'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

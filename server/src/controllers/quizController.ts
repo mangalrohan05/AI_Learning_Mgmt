@@ -51,6 +51,30 @@ export class QuizController {
       next(error);
     }
   }
+
+  public async getLatestAttemptReview(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await quizService.getLatestAttemptReview(
+        req.params.id as string,
+        req.user!.id
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public async deleteQuiz(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await quizService.deleteQuiz(
+        req.params.id as string,
+        req.user!.id
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const quizController = new QuizController();

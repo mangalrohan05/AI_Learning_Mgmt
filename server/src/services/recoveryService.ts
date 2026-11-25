@@ -10,7 +10,7 @@ export async function recoverStalePendingMaterials(): Promise<void> {
     const result = await prisma.material.updateMany({
       where: {
         status: 'PENDING',
-        createdAt: { lt: tenMinutesAgo },
+        updatedAt: { lt: tenMinutesAgo },
       },
       data: {
         status: 'FAILED',

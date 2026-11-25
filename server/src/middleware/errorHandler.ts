@@ -40,8 +40,12 @@ export const errorHandler = (
 
   // 3. Multer File Upload Error
   if (err instanceof multer.MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? `File exceeds upload limit (${env.MAX_FILE_SIZE_MB}MB documents, ${env.MAX_AUDIO_FILE_SIZE_MB}MB audio).`
+        : `Upload error: ${err.message}`;
     return res.status(400).json({
-      error: `Upload error: ${err.message}`,
+      error: message,
       details: { code: err.code, field: err.field },
     });
   }

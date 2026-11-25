@@ -26,6 +26,8 @@ import {
   Award,
   Calendar,
   AlertCircle,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -77,19 +79,25 @@ interface AttemptResult {
 export function CourseQuizzes({
   courseId,
   materials,
+  isCourseOwner = false,
 }: {
   courseId: string;
   materials: Material[];
+  isCourseOwner?: boolean;
 }) {
   const { getToken } = useAuth();
   const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteQuiz, setConfirmDeleteQuiz] = useState<QuizItem | null>(null);
 
   // Generate Dialog State
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('all');
-  const [numQuestions, setNumQuestions] = useState<number>(5);
+  const [numQuestions, setNumQuestions] = useState<number>(10);
+  const [difficulty, setDifficulty] = useState<'any' | 'easy' | 'medium' | 'hard'>('any');
+  const [topic, setTopic] = useState('');
 
   // Taking Quiz State
   const [takingQuiz, setTakingQuiz] = useState<TakingQuiz | null>(null);
@@ -121,6 +129,7 @@ export function CourseQuizzes({
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
+    const clampedCount = Math.min(25, Math.max(1, Number(numQuestions) || 5));
     setGenerating(true);
 
     try {
@@ -129,17 +138,52 @@ export function CourseQuizzes({
 
       const payload = {
         materialId: selectedMaterialId === 'all' ? undefined : selectedMaterialId,
-        numQuestions,
+        numQuestions: clampedCount,
+        difficulty: difficulty === 'any' ? undefined : difficulty,
+        topic: topic.trim() || undefined,
       };
 
       await api.generateQuiz(token, courseId, payload);
-      toast.success('Quiz ready');
+      toast.success(`Quiz with ${clampedCount} questions ready`);
       setGenerateOpen(false);
+      setTopic('');
       loadQuizzes();
     } catch (err: any) {
       toast.error(err.message || 'Failed to generate quiz');
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function viewLastReview(quizId: string) {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const review = await api.getLatestQuizReview(token, quizId);
+      setAttemptResult(review);
+      setTakingQuiz(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load past quiz review');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteQuizConfirmed() {
+    if (!confirmDeleteQuiz) return;
+    setDeletingId(confirmDeleteQuiz.id);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      await api.deleteQuiz(token, confirmDeleteQuiz.id);
+      toast.success(`Deleted "${confirmDeleteQuiz.title}"`);
+      setConfirmDeleteQuiz(null);
+      loadQuizzes();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete quiz');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -519,15 +563,41 @@ export function CourseQuizzes({
                   </div>
                 </div>
 
-                <div className="pt-4 flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs gap-1.5"
-                    onClick={() => startQuiz(q.id)}
-                  >
-                    <span>{q.latestAttempt ? 'Retake' : 'Start'} Quiz</span>
-                  </Button>
+                <div className="pt-4 flex items-center justify-between gap-2">
+                  <div>
+                    {isCourseOwner && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        aria-label="Delete quiz"
+                        onClick={() => setConfirmDeleteQuiz(q)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {q.latestAttempt && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                        onClick={() => viewLastReview(q.id)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>Last Results</span>
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs gap-1.5"
+                      onClick={() => startQuiz(q.id)}
+                    >
+                      <span>{q.latestAttempt ? 'Retake' : 'Start'} Quiz</span>
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -535,13 +605,50 @@ export function CourseQuizzes({
         )}
       </div>
 
+      {/* Delete Quiz Confirmation Dialog */}
+      <Dialog
+        open={!!confirmDeleteQuiz}
+        onOpenChange={(open) => !open && setConfirmDeleteQuiz(null)}
+      >
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete quiz?</DialogTitle>
+            <DialogDescription>
+              Delete{' '}
+              <strong className="text-foreground">
+                &ldquo;{confirmDeleteQuiz?.title}&rdquo;
+              </strong>{' '}
+              and all associated attempts?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmDeleteQuiz(null)}
+              disabled={deletingId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteQuizConfirmed}
+              disabled={deletingId !== null}
+            >
+              {deletingId ? 'Deleting...' : 'Delete Quiz'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Generate Quiz Dialog */}
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle>New Practice Quiz</DialogTitle>
             <DialogDescription>
-              Creates multiple-choice questions based on your course files.
+              Creates 1 to 25 multiple-choice questions drawn across your course files.
             </DialogDescription>
           </DialogHeader>
 
@@ -565,17 +672,74 @@ export function CourseQuizzes({
             </div>
 
             <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                Questions (3–10)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-foreground">
+                  Number of questions (1–25)
+                </label>
+                <span className="text-xs font-semibold text-primary">
+                  {numQuestions}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                {[5, 10, 15, 20, 25].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setNumQuestions(preset)}
+                    className={`flex-1 h-7 rounded-md border text-xs font-medium transition-colors ${
+                      numQuestions === preset
+                        ? 'border-primary bg-primary/15 text-primary'
+                        : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <input
                 type="number"
-                min={3}
-                max={10}
+                min={1}
+                max={25}
                 value={numQuestions}
-                onChange={(e) => setNumQuestions(Number(e.target.value))}
+                onChange={(e) =>
+                  setNumQuestions(Math.min(25, Math.max(1, Number(e.target.value) || 1)))
+                }
                 className="w-full h-9 rounded-lg border border-border bg-background px-3 text-xs"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">
+                  Difficulty
+                </label>
+                <select
+                  value={difficulty}
+                  onChange={(e) =>
+                    setDifficulty(e.target.value as 'any' | 'easy' | 'medium' | 'hard')
+                  }
+                  className="w-full h-9 rounded-lg border border-border bg-background px-3 text-xs"
+                >
+                  <option value="any">Mixed</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">
+                  Topic focus (optional)
+                </label>
+                <input
+                  type="text"
+                  maxLength={120}
+                  placeholder="e.g. Scheduling, TCP"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-border bg-background px-3 text-xs"
+                />
+              </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0 pt-2">

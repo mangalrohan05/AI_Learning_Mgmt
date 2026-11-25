@@ -18,6 +18,13 @@ const submitAttemptSchema = z.object({
   ),
 });
 
+// GET /api/quizzes/:id/attempt/latest - Get graded breakdown for user's latest attempt
+router.get(
+  '/:id/attempt/latest',
+  validate(quizIdParamSchema, 'params'),
+  quizController.getLatestAttemptReview
+);
+
 // GET /api/quizzes/:id - Get quiz for taking (strips correct answers)
 router.get('/:id', validate(quizIdParamSchema, 'params'), quizController.getQuizForTaking);
 
@@ -28,5 +35,8 @@ router.post(
   validate(submitAttemptSchema),
   quizController.submitAttempt
 );
+
+// DELETE /api/quizzes/:id - Delete quiz (course owner only)
+router.delete('/:id', validate(quizIdParamSchema, 'params'), quizController.deleteQuiz);
 
 export default router;

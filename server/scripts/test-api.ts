@@ -246,6 +246,68 @@ async function runTests() {
         `Got status: ${err.statusCode}`
       );
     }
+
+    // ── TEST 14: Manual Text Note & Disk Fallback Download ───────
+    let manualNoteStoragePath: string | null = null;
+    try {
+      const note = await materialService.createTextMaterial(mlCourse.id, alice.id, {
+        title: 'Test Consensus Note',
+        content: 'Paxos and Raft achieve fault-tolerant distributed consensus across replicas.',
+      });
+      createdMaterialIds.push(note.id);
+      manualNoteStoragePath = note.storagePath;
+
+      const dlDisk = await materialService.getMaterialForDownload(note.id, alice.id);
+      await storageProvider.delete(note.storagePath);
+      const dlFallback = await materialService.getMaterialForDownload(note.id, alice.id);
+
+      assert(
+        note.type === MaterialType.TXT &&
+          note.name === 'Test Consensus Note.txt' &&
+          !!note.transcript &&
+          !!dlDisk.fullPath &&
+          !!dlFallback.buffer &&
+          dlFallback.buffer.toString('utf-8').includes('Paxos'),
+        'Manual text note saves transcript and supports ephemeral disk download fallback'
+      );
+    } catch (err: any) {
+      assert(false, 'Manual text note creation/download failed', err.message);
+      if (manualNoteStoragePath) {
+        await storageProvider.delete(manualNoteStoragePath).catch(() => {});
+      }
+    }
+
+    // ── TEST 15: Unenroll & Authoritative isOwner Flag ───────────
+    try {
+      const aliceView = await courseService.getCourseById(mlCourse.id, alice.id);
+      await courseService.enrollInCourse(mlCourse.id, charlie.id);
+      const charlieView = await courseService.getCourseById(mlCourse.id, charlie.id);
+      await courseService.unenrollFromCourse(mlCourse.id, charlie.id);
+
+      let postUnenrollForbidden = false;
+      try {
+        await courseService.getCourseById(mlCourse.id, charlie.id);
+      } catch (e: any) {
+        postUnenrollForbidden = e instanceof AppError && e.statusCode === 403;
+      }
+
+      let ownerUnenrollRejected = false;
+      try {
+        await courseService.unenrollFromCourse(mlCourse.id, alice.id);
+      } catch (e: any) {
+        ownerUnenrollRejected = e instanceof AppError && e.statusCode === 400;
+      }
+
+      assert(
+        aliceView.isOwner === true &&
+          charlieView.isOwner === false &&
+          postUnenrollForbidden &&
+          ownerUnenrollRejected,
+        'Course isOwner flag and unenroll workflow enforce ownership and access control'
+      );
+    } catch (err: any) {
+      assert(false, 'Unenroll and isOwner check failed', err.message);
+    }
   } finally {
     // Complete teardown of any test data created during this run
     if (createdMaterialIds.length > 0) {

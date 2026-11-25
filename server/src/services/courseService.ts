@@ -6,7 +6,7 @@ export class CourseService {
    * List courses the user owns or is enrolled in
    */
   public async getUserCourses(userId: string) {
-    return prisma.course.findMany({
+    const courses = await prisma.course.findMany({
       where: {
         OR: [
           { ownerId: userId },
@@ -23,6 +23,11 @@ export class CourseService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return courses.map((c) => ({
+      ...c,
+      isOwner: c.ownerId === userId,
+    }));
   }
 
   /**
@@ -106,7 +111,10 @@ export class CourseService {
       throw new AppError(403, 'Access denied: You must be enrolled or the course owner');
     }
 
-    return course;
+    return {
+      ...course,
+      isOwner,
+    };
   }
 
   /**
@@ -189,6 +197,34 @@ export class CourseService {
         userId,
       },
     });
+  }
+
+  /**
+   * Unenroll from a course (enrolled non-owners only)
+   */
+  public async unenrollFromCourse(courseId: string, userId: string) {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, ownerId: true },
+    });
+
+    if (!course) {
+      throw new AppError(404, 'Course not found');
+    }
+
+    if (course.ownerId === userId) {
+      throw new AppError(400, 'Course owner cannot unenroll from their own course');
+    }
+
+    const deleted = await prisma.enrollment.deleteMany({
+      where: { courseId, userId },
+    });
+
+    if (deleted.count === 0) {
+      throw new AppError(400, 'You are not enrolled in this course');
+    }
+
+    return { success: true, message: 'Unenrolled from course' };
   }
 }
 

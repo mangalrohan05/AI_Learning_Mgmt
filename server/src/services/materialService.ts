@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { MaterialStatus } from '@prisma/client';
+import { MaterialStatus, MaterialType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { storageProvider } from './storage/localStorageProvider';
@@ -87,16 +87,27 @@ export class MaterialService {
     const fullPath = path.resolve(process.cwd(), material.storagePath);
     try {
       await fs.access(fullPath);
+      return {
+        fullPath,
+        buffer: undefined as Buffer | undefined,
+        fileName: material.name,
+        mimeType: material.mimeType,
+        size: material.size,
+      };
     } catch {
+      // Fallback for manual TXT notes or transcripts if ephemeral disk storage was reset
+      if (material.transcript) {
+        const buffer = Buffer.from(material.transcript, 'utf-8');
+        return {
+          fullPath: '',
+          buffer,
+          fileName: material.type === 'AUDIO' ? `${material.name}.transcript.txt` : material.name,
+          mimeType: 'text/plain; charset=utf-8',
+          size: buffer.length,
+        };
+      }
       throw new AppError(404, 'Material file not found on storage');
     }
-
-    return {
-      fullPath,
-      fileName: material.name,
-      mimeType: material.mimeType,
-      size: material.size,
-    };
   }
 
   /**
@@ -223,12 +234,75 @@ export class MaterialService {
   }
 
   /**
-   * Generates or retrieves a concise summary for a course material
+   * Creates a manual text/note material directly from user-entered text
+   */
+  public async createTextMaterial(
+    courseId: string,
+    userId: string,
+    input: { title: string; content: string }
+  ) {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        enrollments: { where: { userId } },
+      },
+    });
+
+    if (!course) {
+      throw new AppError(404, 'Course not found');
+    }
+
+    const isOwner = course.ownerId === userId;
+    const isEnrolled = course.enrollments.length > 0;
+    if (!isOwner && !isEnrolled) {
+      throw new AppError(403, 'Access denied: You must be enrolled or the course owner');
+    }
+
+    const cleanTitle = input.title.trim();
+    const cleanContent = input.content.replace(/\x00/g, '').trim();
+    const displayName = cleanTitle.toLowerCase().endsWith('.txt')
+      ? cleanTitle
+      : `${cleanTitle}.txt`;
+
+    const buffer = Buffer.from(cleanContent, 'utf-8');
+    const storageFile = await storageProvider.saveBuffer(buffer, displayName, 'text/plain');
+
+    try {
+      const material = await prisma.material.create({
+        data: {
+          courseId,
+          uploaderId: userId,
+          name: displayName,
+          type: MaterialType.TXT,
+          status: MaterialStatus.PENDING,
+          storagePath: storageFile.storagePath,
+          mimeType: 'text/plain',
+          size: buffer.length,
+          transcript: cleanContent,
+        },
+        include: {
+          uploader: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      });
+
+      chatCache.clearCourse(courseId);
+      return material;
+    } catch (dbError) {
+      await storageProvider.delete(storageFile.storagePath);
+      throw dbError;
+    }
+  }
+
+  /**
+   * Generates or retrieves a structured study summary for a course material
    */
   public async summarizeMaterial(
     materialId: string,
     userId: string,
-    courseId?: string
+    courseId?: string,
+    force = false
   ) {
     const material = await prisma.material.findUnique({
       where: { id: materialId },
@@ -259,8 +333,8 @@ export class MaterialService {
       );
     }
 
-    // 1. If summary already exists in database, return stored one (cache)
-    if (material.summary && material.summary.trim()) {
+    // 1. If summary already exists in database and regeneration wasn't requested, return cached
+    if (!force && material.summary && material.summary.trim()) {
       return { summary: material.summary, cached: true };
     }
 
@@ -272,7 +346,7 @@ export class MaterialService {
       );
     }
 
-    // 3. Fetch chunks
+    // 3. Fetch chunks ordered across the full material
     const chunks = await prisma.documentChunk.findMany({
       where: { materialId },
       orderBy: { chunkIndex: 'asc' },
@@ -282,11 +356,18 @@ export class MaterialService {
       throw new AppError(400, 'No extracted content found to summarize.');
     }
 
-    // Combine chunk text up to 15,000 chars
-    const combinedContent = chunks
-      .map((c) => c.content)
-      .join('\n\n')
-      .slice(0, 15000);
+    // Sample evenly across the document so long PDFs aren't cut off after the opening pages
+    const MAX_SUMMARY_CHARS = 45000;
+    let combinedContent = chunks.map((c) => c.content).join('\n\n');
+    if (combinedContent.length > MAX_SUMMARY_CHARS) {
+      const targetChunkCount = Math.min(chunks.length, 32);
+      const step = (chunks.length - 1) / Math.max(targetChunkCount - 1, 1);
+      const sampled: string[] = [];
+      for (let i = 0; i < targetChunkCount; i++) {
+        sampled.push(chunks[Math.round(i * step)]!.content);
+      }
+      combinedContent = sampled.join('\n\n').slice(0, MAX_SUMMARY_CHARS);
+    }
 
     // 4. Call AI summarizer via Google Gemini
     const summary = await summarizeText(combinedContent);

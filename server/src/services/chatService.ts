@@ -1,11 +1,13 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { embedQuery, answerWithContext } from '../lib/ai';
+import { embedQuery, answerWithContext, answerAsTutor } from '../lib/ai';
 import { chatCache } from '../lib/chatCache';
 
 export interface ChatRequestData {
   question: string;
   materialId?: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+  mode?: 'strict' | 'tutor';
 }
 
 export interface ChatResponse {
@@ -28,14 +30,18 @@ interface ChunkQueryResult {
 
 export class ChatService {
   /**
-   * Performs semantic search over course materials (or specific material) and answers
-   * using retrieved context via Google Gemini.
+   * Unified semantic search + Q&A over course materials.
+   * - mode='strict' (default): answers strictly from course excerpts (with 1h cache for single-turn queries)
+   * - mode='tutor': step-by-step explanations with examples, history, and [General Knowledge] fallback
    */
   public async chatCourse(
     courseId: string,
     userId: string,
     data: ChatRequestData
   ): Promise<ChatResponse> {
+    const mode = data.mode === 'tutor' ? 'tutor' : 'strict';
+    const hasHistory = Array.isArray(data.history) && data.history.length > 0;
+
     // 1. Verify course and membership
     const course = await prisma.course.findUnique({
       where: { id: courseId },
@@ -61,26 +67,35 @@ export class ChatService {
       );
     }
 
-    // 2. Guardrails: Verify ready materials
+    // 2. Validate materialId and check ready materials
+    let hasReadyTarget = false;
     if (data.materialId) {
       const targetMaterial = course.materials.find((m) => m.id === data.materialId);
       if (!targetMaterial) {
         throw new AppError(404, 'Specified material not found in this course');
       }
       if (targetMaterial.status !== 'READY') {
-        return {
-          answer: `The selected material ("${targetMaterial.name}") is currently ${targetMaterial.status.toLowerCase()} and cannot be queried yet. Please wait until processing completes.`,
-          sources: [],
-        };
+        if (mode === 'strict') {
+          return {
+            answer: `The selected material ("${targetMaterial.name}") is currently ${targetMaterial.status.toLowerCase()} and cannot be queried yet. Please wait until processing finishes.`,
+            sources: [],
+          };
+        }
+      } else {
+        hasReadyTarget = true;
       }
     } else {
       const readyMaterials = course.materials.filter((m) => m.status === 'READY');
       if (readyMaterials.length === 0) {
-        return {
-          answer:
-            'There are no ready study materials in this course yet. Please upload a PDF, DOCX, or TXT file and wait until processing completes.',
-          sources: [],
-        };
+        if (mode === 'strict') {
+          return {
+            answer:
+              'There are no ready materials in this course yet. Upload a file or write a note in Materials and wait until it finishes processing.',
+            sources: [],
+          };
+        }
+      } else {
+        hasReadyTarget = true;
       }
     }
 
@@ -93,84 +108,88 @@ export class ChatService {
       throw new AppError(400, 'Question is too long (maximum 500 characters)');
     }
 
-    // Check in-memory cache
-    const cachedHit = chatCache.get(courseId, data.materialId, trimmedQuestion);
-    if (cachedHit) {
-      return cachedHit;
+    // Only use cache for single-turn strict queries
+    const canUseCache = mode === 'strict' && !hasHistory;
+    if (canUseCache) {
+      const cachedHit = chatCache.get(courseId, data.materialId, trimmedQuestion);
+      if (cachedHit) {
+        return cachedHit;
+      }
     }
 
-    // 4. Generate query embedding (768-dim vector from text-embedding-004)
-    const queryVector = await embedQuery(trimmedQuestion);
-    const vectorString = `[${queryVector.join(',')}]`;
-
-    // 5. Query top 4 matching chunks using cosine distance (<=>)
+    // 4. Retrieve top 4 matching chunks using pgvector cosine distance (<=>)
     let chunks: ChunkQueryResult[] = [];
+    if (hasReadyTarget) {
+      const queryVector = await embedQuery(trimmedQuestion);
+      const vectorString = `[${queryVector.join(',')}]`;
 
-    if (data.materialId) {
-      chunks = await prisma.$queryRawUnsafe<ChunkQueryResult[]>(
-        `SELECT 
-          dc.id, 
-          dc."materialId", 
-          dc.content, 
-          dc."chunkIndex", 
-          m.name as "materialName",
-          1 - (dc.embedding <=> $1::vector) as similarity
-        FROM "DocumentChunk" dc
-        JOIN "Material" m ON m.id = dc."materialId"
-        WHERE dc."materialId" = $2
-          AND m.status = 'READY'
-          AND dc.embedding IS NOT NULL
-        ORDER BY dc.embedding <=> $1::vector ASC
-        LIMIT 4`,
-        vectorString,
-        data.materialId
-      );
+      if (data.materialId) {
+        chunks = await prisma.$queryRawUnsafe<ChunkQueryResult[]>(
+          `SELECT 
+            dc.id, 
+            dc."materialId", 
+            dc.content, 
+            dc."chunkIndex", 
+            m.name as "materialName",
+            1 - (dc.embedding <=> $1::vector) as similarity
+          FROM "DocumentChunk" dc
+          JOIN "Material" m ON m.id = dc."materialId"
+          WHERE dc."materialId" = $2
+            AND m.status = 'READY'
+            AND dc.embedding IS NOT NULL
+          ORDER BY dc.embedding <=> $1::vector ASC
+          LIMIT 4`,
+          vectorString,
+          data.materialId
+        );
+      } else {
+        chunks = await prisma.$queryRawUnsafe<ChunkQueryResult[]>(
+          `SELECT 
+            dc.id, 
+            dc."materialId", 
+            dc.content, 
+            dc."chunkIndex", 
+            m.name as "materialName",
+            1 - (dc.embedding <=> $1::vector) as similarity
+          FROM "DocumentChunk" dc
+          JOIN "Material" m ON m.id = dc."materialId"
+          WHERE m."courseId" = $2
+            AND m.status = 'READY'
+            AND dc.embedding IS NOT NULL
+          ORDER BY dc.embedding <=> $1::vector ASC
+          LIMIT 4`,
+          vectorString,
+          courseId
+        );
+      }
+    }
+
+    const mappedChunks = chunks.map((c) => ({
+      materialName: c.materialName,
+      content: c.content,
+    }));
+
+    let answer: string;
+    if (mode === 'tutor') {
+      answer = await answerAsTutor(trimmedQuestion, mappedChunks, data.history);
     } else {
-      chunks = await prisma.$queryRawUnsafe<ChunkQueryResult[]>(
-        `SELECT 
-          dc.id, 
-          dc."materialId", 
-          dc.content, 
-          dc."chunkIndex", 
-          m.name as "materialName",
-          1 - (dc.embedding <=> $1::vector) as similarity
-        FROM "DocumentChunk" dc
-        JOIN "Material" m ON m.id = dc."materialId"
-        WHERE m."courseId" = $2
-          AND m.status = 'READY'
-          AND dc.embedding IS NOT NULL
-        ORDER BY dc.embedding <=> $1::vector ASC
-        LIMIT 4`,
-        vectorString,
-        courseId
-      );
+      if (chunks.length === 0) {
+        return {
+          answer: "I couldn't find anything about that in your uploaded course materials.",
+          sources: [],
+        };
+      }
+      answer = await answerWithContext(trimmedQuestion, mappedChunks);
     }
 
-    if (chunks.length === 0) {
-      return {
-        answer:
-          'I could not find any relevant information in the course materials to answer your question.',
-        sources: [],
-      };
-    }
-
-    // 6. Generate answer using Gemini 1.5 Flash via LangChain
-    const answer = await answerWithContext(
-      trimmedQuestion,
-      chunks.map((c) => ({
-        materialName: c.materialName,
-        content: c.content,
-      }))
-    );
-
-    // 7. Format sources
     const sources = chunks.map((c) => ({
       materialName: c.materialName,
       snippet: c.content.length > 250 ? c.content.slice(0, 250) + '...' : c.content,
     }));
 
-    // Cache the response
-    chatCache.set(courseId, data.materialId, trimmedQuestion, { answer, sources });
+    if (canUseCache) {
+      chatCache.set(courseId, data.materialId, trimmedQuestion, { answer, sources });
+    }
 
     return { answer, sources, cached: false };
   }

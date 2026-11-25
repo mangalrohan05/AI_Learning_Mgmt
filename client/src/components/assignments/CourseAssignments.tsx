@@ -20,6 +20,9 @@ import {
   Sparkles,
   ArrowRight,
   TrendingUp,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,6 +31,7 @@ interface AssignmentItem {
   courseId: string;
   studentId: string;
   title: string;
+  content?: string;
   score: number;
   feedback: {
     score: number;
@@ -53,6 +57,28 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
 
   // Selected assignment for detailed modal / expanded view
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentItem | null>(null);
+  const [showSubmittedContent, setShowSubmittedContent] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDeleteAssignment(assignmentId: string) {
+    setDeletingId(assignmentId);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      await api.deleteAssignment(token, courseId, assignmentId);
+      toast.success('Submission deleted');
+      const remaining = assignments.filter((a) => a.id !== assignmentId);
+      setAssignments(remaining);
+      if (selectedAssignment?.id === assignmentId) {
+        setSelectedAssignment(remaining[0] || null);
+        setShowSubmittedContent(false);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete assignment');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function loadAssignments() {
     setLoading(true);
@@ -198,25 +224,71 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
             <div className="space-y-4">
               {/* Score Card */}
               <Card className="border-border bg-card/60 p-5">
-                <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-start justify-between pb-3 border-b border-border/60 gap-3">
                   <div>
                     <h4 className="text-base font-bold">{selectedAssignment.title}</h4>
                     <span className="text-[11px] text-muted-foreground">
                       Submitted on {new Date(selectedAssignment.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-primary">
-                      {selectedAssignment.score}
-                    </span>
-                    <span className="text-xs text-muted-foreground"> / 10</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-primary">
+                        {selectedAssignment.score}
+                      </span>
+                      <span className="text-xs text-muted-foreground"> / 10</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={deletingId === selectedAssignment.id}
+                      aria-label="Delete submission"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteAssignment(selectedAssignment.id)}
+                    >
+                      {deletingId === selectedAssignment.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </div>
 
                 <Markdown
                   content={selectedAssignment.feedback.summary}
-                  className="text-xs text-foreground/90 leading-relaxed mt-3"
+                  className="text-sm text-foreground/90 leading-relaxed mt-3"
                 />
+
+                {selectedAssignment.content && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <button
+                      type="button"
+                      onClick={() => setShowSubmittedContent((prev) => !prev)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                    >
+                      {showSubmittedContent ? (
+                        <>
+                          <ChevronUp className="h-3.5 w-3.5" />
+                          <span>Hide Submitted Work</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3.5 w-3.5" />
+                          <span>View Submitted Work</span>
+                        </>
+                      )}
+                    </button>
+                    {showSubmittedContent && (
+                      <div className="mt-2 rounded-lg bg-muted/30 p-3 border border-border/40 max-h-56 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap font-sans text-xs text-foreground/85 leading-relaxed">
+                          {selectedAssignment.content}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
               </Card>
 
               {/* Strengths & Weaknesses */}
@@ -275,7 +347,10 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setSelectedAssignment(item)}
+                        onClick={() => {
+                          setSelectedAssignment(item);
+                          setShowSubmittedContent(false);
+                        }}
                         className={`p-2.5 rounded-xl border text-left shrink-0 w-48 text-xs transition-colors ${
                           selectedAssignment.id === item.id
                             ? 'border-primary bg-primary/10 text-primary'

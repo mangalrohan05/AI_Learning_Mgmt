@@ -74,6 +74,18 @@ export class CourseController {
       next(error);
     }
   }
+
+  public async unenrollFromCourse(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await courseService.unenrollFromCourse(
+        req.params.id as string,
+        req.user!.id
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const courseController = new CourseController();

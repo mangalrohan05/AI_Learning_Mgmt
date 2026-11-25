@@ -18,7 +18,7 @@ export class MaterialController {
 
   public async streamFile(req: Request, res: Response, next: NextFunction) {
     try {
-      const { fullPath, fileName, mimeType, size } =
+      const { fullPath, buffer, fileName, mimeType, size } =
         await materialService.getMaterialForDownload(
           req.params.materialId as string,
           req.user!.id
@@ -31,6 +31,11 @@ export class MaterialController {
         `attachment; filename="${fileName.replace(/"/g, '')}"; filename*=UTF-8''${encodedName}`
       );
       res.setHeader('Content-Length', size);
+
+      if (buffer) {
+        res.send(buffer);
+        return;
+      }
 
       const stream = fs.createReadStream(fullPath);
       stream.on('error', (err) => next(err));
@@ -62,11 +67,35 @@ export class MaterialController {
     }
   }
 
+  public async createTextMaterial(req: Request, res: Response, next: NextFunction) {
+    try {
+      const material = await materialService.createTextMaterial(
+        req.params.courseId as string,
+        req.user!.id,
+        req.body
+      );
+
+      processingService.processMaterial(material.id).catch((err) => {
+        console.error(
+          `[TextMaterial] Background processing error for material ${material.id}:`,
+          err?.message || err
+        );
+      });
+
+      res.status(201).json(material);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public async summarizeMaterial(req: Request, res: Response, next: NextFunction) {
     try {
+      const force = req.body?.force === true || req.query?.force === 'true';
       const result = await materialService.summarizeMaterial(
         req.params.materialId as string,
-        req.user!.id
+        req.user!.id,
+        undefined,
+        force
       );
       res.json(result);
     } catch (error) {
@@ -110,14 +139,12 @@ export class MaterialController {
         res.status(403).json({ error: 'Access denied: Only the uploader or course owner can reprocess' });
         return;
       }
-      if (material.type === 'AUDIO') {
-        res.status(400).json({ error: 'Audio files cannot be reprocessed (Whisper integration coming soon)' });
-        return;
-      }
-
-      // Reset to PENDING so the UI shows processing state immediately
+      // Reset to PENDING and clear previous failure reason so the UI shows processing state immediately
       const { prisma } = await import('../lib/prisma');
-      await prisma.material.update({ where: { id: materialId }, data: { status: 'PENDING' } });
+      await prisma.material.update({
+        where: { id: materialId },
+        data: { status: 'PENDING', failureReason: null },
+      });
 
       // Fire-and-forget reprocessing
       processingService.processMaterial(materialId).catch((err) => {

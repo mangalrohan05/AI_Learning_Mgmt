@@ -15,6 +15,19 @@ const materialIdParamSchema = z.object({
   materialId: z.string().min(1, 'Material ID is required'),
 });
 
+const createTextMaterialSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Title is required')
+    .max(120, 'Title cannot exceed 120 characters'),
+  content: z
+    .string()
+    .trim()
+    .min(20, 'Please enter at least 20 characters of notes')
+    .max(100000, 'Notes cannot exceed 100,000 characters'),
+});
+
 // All material routes require authentication
 router.use(requireAuth);
 
@@ -39,6 +52,14 @@ router.post(
   validate(courseIdParamSchema, 'params'),
   upload.single('file'),
   materialController.uploadMaterial
+);
+
+// POST /api/materials/:courseId/text - Create manual text/note material (owner or enrolled)
+router.post(
+  '/:courseId/text',
+  validate(courseIdParamSchema, 'params'),
+  validate(createTextMaterialSchema),
+  materialController.createTextMaterial
 );
 
 // POST /api/materials/:materialId/summary - Generate or get material summary (owner or enrolled)

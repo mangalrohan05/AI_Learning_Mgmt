@@ -30,6 +30,10 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
+  Copy,
+  Check,
+  AlignLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -62,8 +66,28 @@ export function MaterialList({
   const [confirmDeleteMaterial, setConfirmDeleteMaterial] = useState<Material | null>(null);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
 
-  // Per-material inline summary state
+  // Per-material inline summary state & note/transcript viewer state
   const [summaryStates, setSummaryStates] = useState<Record<string, SummaryState>>({});
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  function toggleNoteViewer(materialId: string) {
+    setExpandedNotes((prev) => ({
+      ...prev,
+      [materialId]: !prev[materialId],
+    }));
+  }
+
+  async function handleCopyText(materialId: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(materialId);
+      setTimeout(() => setCopiedId((prev) => (prev === materialId ? null : prev)), 2000);
+      toast.success('Copied to clipboard');
+    } catch {
+      toast.error('Failed to copy text');
+    }
+  }
 
   async function handleReprocess(material: Material) {
     setReprocessingId(material.id);
@@ -104,17 +128,22 @@ export function MaterialList({
     }
   }
 
-  async function fetchSummary(material: Material) {
+  async function fetchSummary(material: Material, force = false) {
     setSummaryStates((prev) => ({
       ...prev,
-      [material.id]: { expanded: true, loading: true, error: undefined },
+      [material.id]: {
+        expanded: true,
+        loading: true,
+        text: force ? prev[material.id]?.text : undefined,
+        error: undefined,
+      },
     }));
 
     try {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const data = await api.summarizeMaterial(token, material.id);
+      const data = await api.summarizeMaterial(token, material.id, force);
       setSummaryStates((prev) => ({
         ...prev,
         [material.id]: {
@@ -306,7 +335,25 @@ export function MaterialList({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0 flex-wrap justify-end">
+                  {m.transcript && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-8 text-xs"
+                      onClick={() => toggleNoteViewer(m.id)}
+                    >
+                      <AlignLeft className="h-3.5 w-3.5" />
+                      <span>
+                        {expandedNotes[m.id]
+                          ? 'Hide'
+                          : m.type === 'AUDIO'
+                            ? 'Transcript'
+                            : 'View Note'}
+                      </span>
+                    </Button>
+                  )}
+
                   {m.status === 'READY' && (
                     <Button
                       variant="outline"
@@ -379,14 +426,56 @@ export function MaterialList({
                 </div>
               </div>
 
+              {/* Inline Note / Transcript Viewer */}
+              {m.transcript && expandedNotes[m.id] && (
+                <div className="mt-4 pt-3.5 border-t border-border/60 transition-all">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <AlignLeft className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">
+                        {m.type === 'AUDIO' ? 'Audio Transcript' : 'Saved Note Text'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                        onClick={() => handleCopyText(m.id, m.transcript || '')}
+                      >
+                        {copiedId === m.id ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        <span>{copiedId === m.id ? 'Copied' : 'Copy'}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => toggleNoteViewer(m.id)}
+                      >
+                        Collapse
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-3.5 border border-border/40 max-h-80 overflow-y-auto">
+                    <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed">
+                      {m.transcript}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
               {/* Inline Expandable Summary */}
               {summaryState?.expanded && (
                 <div className="mt-4 pt-3.5 border-t border-border/60 transition-all">
-                  <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center justify-between mb-2.5 gap-2">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-primary" />
                       <span className="text-xs font-semibold text-foreground">
-                        Summary
+                        Study Summary
                       </span>
                       {summaryState.cached && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -394,21 +483,35 @@ export function MaterialList({
                         </Badge>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => toggleSummary(m)}
-                    >
-                      Collapse
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={summaryState.loading}
+                        className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                        onClick={() => fetchSummary(m, true)}
+                      >
+                        <RefreshCw
+                          className={`h-3 w-3 ${summaryState.loading ? 'animate-spin' : ''}`}
+                        />
+                        <span>Regenerate</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => toggleSummary(m)}
+                      >
+                        Collapse
+                      </Button>
+                    </div>
                   </div>
 
                   {summaryState.loading ? (
                     <div className="space-y-2 py-3">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                        <span>Generating summary...</span>
+                        <span>Generating detailed study summary...</span>
                       </div>
                       <Skeleton className="h-4 w-full" />
                       <Skeleton className="h-4 w-5/6" />
@@ -421,13 +524,13 @@ export function MaterialList({
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={() => fetchSummary(m)}
+                        onClick={() => fetchSummary(m, true)}
                       >
                         Retry
                       </Button>
                     </div>
                   ) : (
-                    <div className="bg-muted/30 rounded-lg p-3.5 border border-border/40 text-xs">
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/40 text-sm leading-relaxed">
                       <Markdown content={summaryState.text || ''} />
                     </div>
                   )}

@@ -12,6 +12,14 @@ export const chatModel = new ChatGoogleGenerativeAI({
   maxRetries: 1,
 });
 
+const longOutputModel = new ChatGoogleGenerativeAI({
+  model: 'gemini-3.1-flash-lite',
+  apiKey: env.GEMINI_API_KEY,
+  temperature: 0.2,
+  maxOutputTokens: 4096,
+  maxRetries: 1,
+});
+
 export const embeddingsModel = new GoogleGenerativeAIEmbeddings({
   model: 'gemini-embedding-001',
   apiKey: env.GEMINI_API_KEY,
@@ -54,7 +62,8 @@ export function handleAiError(error: any): Error {
 async function invokeStructuredJson<T>(
   systemPrompt: string,
   userPrompt: string,
-  schema: z.ZodType<T>
+  schema: z.ZodType<T>,
+  model: ChatGoogleGenerativeAI = chatModel
 ): Promise<T> {
   const parseJson = (text: string) => {
     const cleaned = text
@@ -66,7 +75,7 @@ async function invokeStructuredJson<T>(
   };
 
   try {
-    const res1 = await chatModel.invoke([
+    const res1 = await model.invoke([
       new SystemMessage(
         `${systemPrompt}\nIMPORTANT: Respond strictly with valid JSON conforming to the schema. Do not include markdown codeblocks, backticks, or preamble.`
       ),
@@ -77,7 +86,7 @@ async function invokeStructuredJson<T>(
   } catch (err1) {
     // Retry once with an explicit correction prompt
     try {
-      const res2 = await chatModel.invoke([
+      const res2 = await model.invoke([
         new SystemMessage(
           `${systemPrompt}\nYour previous response was not valid JSON. You MUST return strictly valid raw JSON conforming to the schema. No markdown formatting.`
         ),
@@ -229,18 +238,27 @@ Tutor Explanation:`;
 }
 
 /**
- * Generates a concise structured summary from material text
+ * Generates a thorough, well-structured study summary from material text
  */
 export async function summarizeText(content: string): Promise<string> {
-  const systemPrompt = `Summarize the provided course material clearly and concisely using clean Markdown.
-Cover:
-- A short overview of the topic
-- Key concepts and definitions
-- Essential takeaways
-Write directly and stick to the material's main points.`;
+  const systemPrompt = `Create thorough, well-organized study notes from the provided course material using clean Markdown.
+Structure your summary into clear sections:
+## Overview
+Briefly explain the main topic and scope of this material.
+
+## Core Concepts & Details
+Break down each major topic, mechanism, formula, or argument in detail with clear bullet points or subheadings so a student can actually study from this without losing important context.
+
+## Key Terms & Definitions
+Define important terminology, algorithms, or theorems mentioned.
+
+## Key Takeaways
+List the most important points worth remembering for exams or assignments.
+
+Write clearly and cover all major sections present in the text — do not reduce a multi-section document to a tiny blurb.`;
 
   try {
-    const response = await chatModel.invoke([
+    const response = await longOutputModel.invoke([
       new SystemMessage(systemPrompt),
       new HumanMessage(`Material text to summarize:\n\n${content}`),
     ]);
@@ -266,31 +284,65 @@ export const QuizQuestionsArraySchema = z.array(QuizQuestionSchema);
 export type QuizQuestion = z.infer<typeof QuizQuestionSchema>;
 
 /**
- * Generates multiple choice quiz questions from course material chunks
+ * Generates multiple choice quiz questions from course material chunks (supports 1 to 25)
  */
 export async function generateQuizQuestions(
   contexts: string[],
-  numQuestions: number
+  numQuestions: number,
+  options?: { difficulty?: 'easy' | 'medium' | 'hard'; topic?: string }
 ): Promise<QuizQuestion[]> {
-  const clampedNum = Math.min(Math.max(numQuestions, 3), 10);
-  const combinedContext = contexts.join('\n\n---\n\n').slice(0, 10000);
+  const clampedNum = Math.min(Math.max(numQuestions, 1), 25);
+  const combinedContext = contexts.join('\n\n---\n\n').slice(0, 24000);
 
-  const systemPrompt = `You are an academic assessment expert.
-Generate exactly ${clampedNum} multiple-choice questions based on the provided course material.
+  const difficultyNote = options?.difficulty
+    ? `Target difficulty: ${options.difficulty}.`
+    : 'Include a balanced mix of recall and applied conceptual questions.';
+  const topicNote = options?.topic?.trim()
+    ? `Prioritize concepts related to: "${options.topic.trim()}".`
+    : 'Spread questions across all sections of the material.';
+
+  const makeBatch = async (count: number, excludeQuestions: string[]) => {
+    const avoidClause =
+      excludeQuestions.length > 0
+        ? `\nDo NOT repeat or rephrase any of these already-generated questions:\n${excludeQuestions.map((q) => `- ${q}`).join('\n')}`
+        : '';
+
+    const systemPrompt = `You are an academic assessment expert.
+Generate exactly ${count} unique multiple-choice questions based on the provided course material.
+${difficultyNote}
+${topicNote}${avoidClause}
 Each question must have:
 - "question": string, unambiguous and focused on important concepts.
 - "options": array of exactly 4 strings (plausible options, labeled implicitly 0 to 3).
 - "correctAnswer": integer from 0 to 3 pointing to the index of the single correct option.
 - "explanation": string, concise rationale for why the answer is correct based on the material.
-Output format: JSON array of question objects.`;
+Output format: JSON array of exactly ${count} question objects.`;
 
-  const userPrompt = `Material content:\n${combinedContext}\n\nGenerate ${clampedNum} multiple-choice questions:`;
+    const userPrompt = `Material content:\n${combinedContext}\n\nGenerate ${count} multiple-choice questions:`;
 
-  return await invokeStructuredJson(
-    systemPrompt,
-    userPrompt,
-    QuizQuestionsArraySchema
+    return await invokeStructuredJson(
+      systemPrompt,
+      userPrompt,
+      QuizQuestionsArraySchema,
+      longOutputModel
+    );
+  };
+
+  if (clampedNum <= 13) {
+    const batch = await makeBatch(clampedNum, []);
+    return batch.slice(0, clampedNum);
+  }
+
+  // Split larger quizzes into two batches so output never truncates
+  const firstCount = Math.ceil(clampedNum / 2);
+  const secondCount = clampedNum - firstCount;
+  const firstBatch = await makeBatch(firstCount, []);
+  const secondBatch = await makeBatch(
+    secondCount,
+    firstBatch.map((q) => q.question)
   );
+
+  return [...firstBatch, ...secondBatch].slice(0, clampedNum);
 }
 
 export const StudyPlanSchema = z.object({

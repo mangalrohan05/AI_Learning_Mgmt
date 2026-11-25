@@ -27,13 +27,27 @@ const courseIdParamSchema = z.object({
   id: z.string().min(1, 'Course ID is required'),
 });
 
+const assignmentParamSchema = z.object({
+  id: z.string().min(1, 'Course ID is required'),
+  assignmentId: z.string().min(1, 'Assignment ID is required'),
+});
+
 const chatBodySchema = z.object({
   question: z
     .string()
     .trim()
     .min(1, 'Question is required')
-    .max(500, 'Question cannot exceed 500 characters'),
+    .max(1000, 'Question cannot exceed 1000 characters'),
   materialId: z.string().optional(),
+  mode: z.enum(['strict', 'tutor']).optional(),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(2000),
+      })
+    )
+    .optional(),
 });
 
 const tutorBodySchema = z.object({
@@ -41,12 +55,12 @@ const tutorBodySchema = z.object({
     .string()
     .trim()
     .min(1, 'Question is required')
-    .max(500, 'Question cannot exceed 500 characters'),
+    .max(1000, 'Question cannot exceed 1000 characters'),
   history: z
     .array(
       z.object({
         role: z.enum(['user', 'assistant']),
-        content: z.string().max(1000),
+        content: z.string().max(2000),
       })
     )
     .optional(),
@@ -54,7 +68,9 @@ const tutorBodySchema = z.object({
 
 const generateQuizSchema = z.object({
   materialId: z.string().optional(),
-  numQuestions: z.number().int().min(3).max(10).optional(),
+  numQuestions: z.number().int().min(1).max(25).optional(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  topic: z.string().trim().max(120).optional(),
 });
 
 const studyPlanSchema = z.object({
@@ -92,6 +108,9 @@ router.delete('/:id', validate(courseIdParamSchema, 'params'), courseController.
 
 // POST /api/courses/:id/enroll - Enroll in course (non-owner only, prevents duplicate)
 router.post('/:id/enroll', validate(courseIdParamSchema, 'params'), courseController.enrollInCourse);
+
+// DELETE /api/courses/:id/enroll - Leave an enrolled course
+router.delete('/:id/enroll', validate(courseIdParamSchema, 'params'), courseController.unenrollFromCourse);
 
 // POST /api/courses/:id/chat - Semantic search + RAG answer from course materials (owner or enrolled)
 router.post(
@@ -152,6 +171,13 @@ router.get(
   '/:id/assignments',
   validate(courseIdParamSchema, 'params'),
   assignmentController.list
+);
+
+// DELETE /api/courses/:id/assignments/:assignmentId - Delete past evaluation
+router.delete(
+  '/:id/assignments/:assignmentId',
+  validate(assignmentParamSchema, 'params'),
+  assignmentController.deleteAssignment
 );
 
 export default router;

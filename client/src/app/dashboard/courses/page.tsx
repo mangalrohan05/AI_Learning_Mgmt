@@ -59,12 +59,13 @@ export default function CoursesPage() {
   }, [getToken]);
 
   const currentUserId = user?.id;
-  // A course is owned if ownerId matches, or owner.id matches, or owner.email matches
+  // Prefer backend isOwner flag, fall back to client comparisons
   const ownedCourses = courses.filter(
     (c) =>
-      c.ownerId === currentUserId ||
-      c.owner?.id === currentUserId ||
-      c.owner?.email === user?.primaryEmailAddress?.emailAddress
+      c.isOwner ??
+      (c.ownerId === currentUserId ||
+        c.owner?.id === currentUserId ||
+        c.owner?.email === user?.primaryEmailAddress?.emailAddress)
   );
   const enrolledCourses = courses.filter((c) => !ownedCourses.includes(c));
 

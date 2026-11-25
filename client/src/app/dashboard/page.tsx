@@ -17,6 +17,8 @@ import {
   TrendingUp,
   BarChart3,
   CheckCircle2,
+  ArrowRight,
+  Clock,
 } from 'lucide-react';
 import {
   BarChart,
@@ -44,11 +46,21 @@ interface ProgressData {
     score: number;
     date: string;
   }[];
+  recentCourses?: {
+    id: string;
+    title: string;
+    description: string | null;
+    isOwner: boolean;
+    materialsCount: number;
+    quizzesCount: number;
+  }[];
   courseProgress: {
     courseId: string;
     courseTitle: string;
     totalQuizzes: number;
     completedQuizzes: number;
+    materialsCount?: number;
+    assignmentsCount?: number;
     completionPercentage: number;
   }[];
 }
@@ -58,8 +70,10 @@ export default function DashboardOverviewPage() {
   const { user } = useUser();
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [slowLoading, setSlowLoading] = useState(false);
 
   useEffect(() => {
+    const slowTimer = setTimeout(() => setSlowLoading(true), 4000);
     async function loadProgress() {
       try {
         const token = await getToken();
@@ -70,10 +84,13 @@ export default function DashboardOverviewPage() {
       } catch (err) {
         console.error('Failed to load dashboard progress:', err);
       } finally {
+        clearTimeout(slowTimer);
         setLoading(false);
+        setSlowLoading(false);
       }
     }
     loadProgress();
+    return () => clearTimeout(slowTimer);
   }, [getToken]);
 
   return (
@@ -99,6 +116,16 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Cold-Start Server Wake Notice */}
+      {loading && slowLoading && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-200">
+          <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+          <span>
+            Waking up the backend server — free-tier cold starts can take up to 30 seconds on the first load.
+          </span>
+        </div>
+      )}
 
       {/* Overview Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -310,6 +337,12 @@ export default function DashboardOverviewPage() {
                         style={{ width: `${item.completionPercentage}%` }}
                       />
                     </div>
+
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-0.5">
+                      <span>{item.materialsCount ?? 0} materials</span>
+                      <span>•</span>
+                      <span>{item.assignmentsCount ?? 0} assignments</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -325,6 +358,50 @@ export default function DashboardOverviewPage() {
           </div>
         </Card>
       </div>
+
+      {/* Quick Access: Your Courses */}
+      {!loading && progress?.recentCourses && progress.recentCourses.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold">Your Courses</h2>
+            <Link
+              href="/dashboard/courses"
+              className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+            >
+              View all <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {progress.recentCourses.slice(0, 6).map((course) => (
+              <Link
+                key={course.id}
+                href={`/dashboard/courses/${course.id}`}
+                className="group rounded-xl border border-border bg-card/60 p-4 hover:border-primary/50 hover:bg-card/90 transition-all flex flex-col justify-between gap-3"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant={course.isOwner ? 'default' : 'secondary'} className="text-[10px]">
+                      {course.isOwner ? 'Owner' : 'Enrolled'}
+                    </Badge>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                  </div>
+                  <h3 className="text-sm font-semibold line-clamp-1 group-hover:text-primary transition-colors">
+                    {course.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {course.description || 'Open course workspace'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground border-t border-border/50 pt-2">
+                  <span>{course.materialsCount} materials</span>
+                  <span>•</span>
+                  <span>{course.quizzesCount} quizzes</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

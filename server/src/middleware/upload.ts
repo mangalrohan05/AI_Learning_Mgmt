@@ -81,12 +81,12 @@ const fileFilter = (
   cb(null, true);
 };
 
-// Maximum possible limit is the audio limit (200MB)
+// Allow up to the larger of document / audio caps; validateFileSize enforces per-type limits
 export const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: env.MAX_AUDIO_FILE_SIZE_MB * 1024 * 1024,
+    fileSize: Math.max(env.MAX_FILE_SIZE_MB, env.MAX_AUDIO_FILE_SIZE_MB) * 1024 * 1024,
   },
 });
 
