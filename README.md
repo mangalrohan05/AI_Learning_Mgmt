@@ -1,40 +1,84 @@
 # AI Learning Management System (AI LMS)
 
-A modern, full-stack AI Learning Management System built as an npm monorepo with Next.js 15 (App Router, Tailwind CSS, shadcn/ui) on the frontend and an Express 4 REST API with strict TypeScript on the backend. Data persistence is managed with Prisma ORM on Neon Lakebase Postgres with `pgvector` for vector similarity search, while user authentication and RBAC session security are powered by Clerk. AI capabilities leverage Google Gemini (`gemini-2.5-flash-lite`, `text-embedding-004`) for semantic RAG document search, patient AI tutoring, automated quiz generation, personalized study planning, and assignment evaluation, combined with Groq Whisper (`whisper-large-v3-turbo`) for high-speed lecture audio transcription.
+A full-stack **AI Learning Management System** built as an npm monorepo with **Next.js 15** (App Router, React 19, Tailwind CSS, Radix UI) on the frontend and an **Express 4** TypeScript REST API on the backend. Persistence runs on **Neon PostgreSQL** with `pgvector` via **Prisma ORM**, authentication is handled by **Clerk**, and AI workflows combine **Google Gemini** (`gemini-3.1-flash-lite` & `gemini-embedding-001`) with **Groq Whisper** (`whisper-large-v3-turbo`) for lecture audio transcription.
+
+- **Live Frontend (Vercel):** [https://ai-learning-mgmt.vercel.app](https://ai-learning-mgmt.vercel.app)
+- **Live Backend (Render):** [https://ai-learning-mgmt.onrender.com/health](https://ai-learning-mgmt.onrender.com/health)
+
+---
+
+## Core Capabilities
+
+- **Course Management & Enrollment:** Create courses as an instructor/owner, edit or delete owned courses, search public courses in Explore, enroll with one click, and leave enrolled courses cleanly.
+- **File Uploads & Manual `Write Note` Editor:**
+  - Drag-and-drop upload for `PDF`, `DOCX`, `DOC`, `TXT` (up to `50 MB`) and lecture audio (`MP3`, `WAV`, `M4A`, `OGG`, `WEBM`, `AAC`, `FLAC` up to `25 MB`).
+  - Built-in **Write Note** editor to write or paste lecture notes and study outlines directly without needing a local file.
+  - Background text extraction (`pdfjs-dist`, `mammoth`, Groq Whisper transcription), recursive chunking, and 768-dim vector embedding (`pgvector`) with inline **View Note / Transcript** preview and retry on failed jobs.
+- **Structured Document Summaries:** Generates detailed Markdown study guides sampled across the full document (Key Concepts, Terms & Definitions, Key Takeaways) with caching and one-click **Regenerate**.
+- **Unified `Ask AI` Tab:** Switch seamlessly between **Notes Only** (strict RAG answers with inline cited source snippets) and **Tutor Mode** (step-by-step guided explanations with multi-turn follow-up context), scoped to all materials or a single selected file.
+- **Practice Quizzes (`1–25` Questions):** Generate customizable MCQs with optional **Difficulty** (`easy` / `medium` / `hard`) and **Topic** focus. Quizzes generate asynchronously in the background while keeping the workspace responsive, strip answers during attempts, support **Last Results** review with explanations, and let owners delete quizzes.
+- **Personalized Study Planner:** Builds structured weekly schedules and task breakdowns informed by course materials, weekly available hours, target exam dates, and topics missed on past quizzes.
+- **Assignment Evaluator:** Submit text drafts or attach `PDF` / `DOCX` / `TXT` documents for rubric grading out of 10 with strengths, weaknesses, revision suggestions, submitted-work viewer, and submission deletion.
+- **Learning Analytics Dashboard:** Tracks courses, uploaded materials, quiz attempts, evaluated assignments, average scores, recent score charts (Recharts), per-course completion progress, quick course cards, and cold-start wake notices.
+
+---
+
+## Project Structure
+
+```text
+├── client/                  # Next.js 15 App Router frontend (React 19, Tailwind, Clerk, Recharts)
+│   └── src/
+│       ├── app/             # Landing page, auth routes, Dashboard, Courses, Explore
+│       ├── components/      # MaterialUploader (Upload + Write Note), MaterialList, CourseChat (Ask AI),
+│       │                    # CourseQuizzes, CourseStudyPlan, CourseAssignments, UI primitives
+│       └── lib/api.ts       # Typed API client with Clerk Bearer token attachment
+├── server/                  # Express 4 TypeScript REST API
+│   ├── prisma/              # Prisma schema, migrations, and deterministic seed script
+│   ├── scripts/             # Automated API & Phase 3 verification suites
+│   └── src/
+│       ├── controllers/     # Auth, Course, Material, Chat, Tutor, Quiz, StudyPlan, Assignment, Progress
+│       ├── middleware/      # Clerk JWT auth, Zod request validation, Multer disk upload, error handler
+│       ├── routes/          # Express routers under /api/*
+│       └── services/        # RAG vector search, Gemini AI, Groq Whisper, background recovery, analytics
+└── package.json             # npm workspaces root scripts (dev, build, lint, test, seed)
+```
 
 ---
 
 ## Environment Configuration
 
 ### 1. Backend (`server/.env`)
+
 ```env
 # Server Configuration
 PORT=8000
 NODE_ENV=development
+# Single origin or comma-separated origins allowed by CORS
 CLIENT_URL=http://localhost:3000
 
-# Database (Neon Lakebase Postgres)
+# Database (Neon Postgres with pgvector)
 DATABASE_URL="postgresql://user:password@ep-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
 DIRECT_URL="postgresql://user:password@ep-direct.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
 # Clerk Authentication (Server Secret Key)
 CLERK_SECRET_KEY="sk_test_..."
 
-# Google Gemini AI (RAG, Tutor, Quizzes, Study Plans, Summaries)
+# Google Gemini AI (Embeddings & Chat / Summaries / Quizzes / Study Plan / Grading)
 GEMINI_API_KEY="AIzaSy..."
 
-# Groq Cloud (Lecture Audio Transcription via whisper-large-v3-turbo)
+# Groq Cloud (Audio transcription via whisper-large-v3-turbo)
 GROQ_API_KEY="gsk_..."
 
-# File Storage & Limits
+# File Storage & Upload Limits
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE_MB=50
 MAX_AUDIO_FILE_SIZE_MB=25
 ```
 
 ### 2. Frontend (`client/.env.local`)
+
 ```env
-# Clerk Authentication (Publishable Key)
+# Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
 CLERK_SECRET_KEY="sk_test_..."
 
@@ -44,146 +88,97 @@ NEXT_PUBLIC_API_URL="http://localhost:8000"
 
 ---
 
-## Exact Commands to Run Locally
+## Running Locally
 
 ```bash
-# 1. Install dependencies across the monorepo
+# 1. Install dependencies across client and server workspaces
 npm install
 
-# 2. Deploy database migrations and generate Prisma client
+# 2. Apply database migrations and generate Prisma client
 cd server && npx prisma migrate deploy && npx prisma generate && cd ..
 
-# 3. Seed deterministic demo data (Alice, Bob, sample courses & materials)
+# 3. Seed demo users, courses, and sample materials (optional)
 npm run seed
 
-# 4. Start frontend and backend concurrently
+# 4. Run frontend (port 3000) and backend (port 8000) concurrently
 npm run dev
 ```
 
-The frontend will be available at [http://localhost:3000](http://localhost:3000) and the Express API at [http://localhost:8000](http://localhost:8000).
+Available workspace scripts from the repository root:
+
+- `npm run dev` — Start both Next.js and Express dev servers
+- `npm run build` — Run `prisma generate && tsc` on `server` and `next build` on `client`
+- `npm run lint` — Type-check server (`tsc --noEmit`) and lint client (`next lint`)
+- `npm test` — Run all backend verification suites (`test-api.ts` and `test-phase3.ts`)
 
 ---
 
 ## Verification & Testing
 
-### Running the Automated API Test Suite
-The backend includes a comprehensive automated test script (`server/scripts/test-api.ts`) that validates permission boundaries, upload limits, and edge cases against the database with automatic artifact cleanup:
-```bash
-npm run test:api -w server
-```
+Run all automated tests from the root directory:
 
-Validated test cases:
-1. `401` Unauthorized when request lacks a valid token
-2. `403` Forbidden when non-member accesses private course details
-3. `403` Forbidden when non-member accesses course materials
-4. `400` Bad Request when owner attempts to enroll in their own course
-5. `400` Bad Request on duplicate course enrollment
-6. `403` Forbidden when non-owner modifies or deletes a course
-7. `403` Forbidden when non-owner / non-uploader deletes a material
-8. Rejected invalid file extensions & MIME types (e.g. `.exe`, `.js`)
-9. Rejected oversized documents (`> 50MB`)
-10. Rejected oversized audio recordings (`> 25MB`)
-11. Accepted valid documents (`PDF`, `DOCX`, `TXT`) and audio (`MP3`, `WAV`, `M4A`)
-12. Resilient file deletion (does not crash when seed file has no physical disk artifact)
-13. Explore courses lists available un-enrolled courses
-14. Explore courses excludes courses the user is already enrolled in or owns
-15. Safe cleanup via `try/finally` preserving seeded rows
-
-### Manual HTTP Testing via `server/api.http`
-You can test all endpoints using the [VS Code REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) or JetBrains HTTP Client with `server/api.http`.
-
-#### How to Obtain a Clerk Session Token:
-1. Start the app with `npm run dev` and open `http://localhost:3000` in your browser.
-2. Sign in or sign up.
-3. Open your browser Developer Tools Console (`F12`) and run:
-   ```javascript
-   await window.Clerk.session.getToken()
-   ```
-4. Copy the resulting JWT string and replace `@token = ...` in `server/api.http`.
-
----
-
-## Core API Endpoints
-
-### Health Check
-- `GET /health` - Minimal database connectivity and health probe (returns `{ status: "ok", database: "connected", timestamp }`)
-
-### Auth & User Profile
-- `GET /api/auth/me` - Resolves DB user from Clerk session; automatically provisions user record on first login via `prisma.user.upsert`
-
-### Courses
-- `GET /api/courses` - List courses the user owns or is enrolled in
-- `GET /api/courses/explore` - List available courses for enrollment (excludes owned/enrolled)
-- `POST /api/courses` - Create a course (creator becomes owner)
-- `GET /api/courses/:id` - Course details with student count, material count, and owner info (owner or enrolled only)
-- `PUT /api/courses/:id` - Update title/description (owner only)
-- `DELETE /api/courses/:id` - Delete course with cascade cleanup (owner only)
-- `POST /api/courses/:id/enroll` - Enroll in course (non-owner only; prevents duplicates)
-
-### Course Materials
-- `GET /api/materials/:courseId` - List materials for a course (owner or enrolled)
-- `GET /api/materials/file/:materialId` - Stream / download material file with proper headers (owner or enrolled)
-- `POST /api/materials/:courseId/upload` - Upload file (multipart/form-data via Multer disk streaming; 50MB documents, 25MB audio)
-- `DELETE /api/materials/:materialId` - Delete material record and underlying storage file (uploader or course owner only)
-
-### AI & Document Intelligence (Phase 2 & Phase 3)
-- `POST /api/courses/:id/chat` - RAG semantic search over course materials with Gemini answering strictly from context (`{ question, materialId? }`)
-- `POST /api/materials/:id/summary` - Generate and cache concise structured summary from extracted material chunks
-- `POST /api/courses/:id/tutor` - Interactive patient AI Tutor with step-by-step reasoning, examples, and `[General Knowledge]` source tagging (`{ question, history? }`)
-- `POST /api/courses/:id/quizzes/generate` - Generate multiple-choice quiz (3-10 questions) from course materials (`{ numQuestions, materialId? }`)
-- `GET /api/courses/:id/quizzes` - List quizzes created for a course
-- `GET /api/quizzes/:id` - Fetch quiz questions (sanitized without correct answers or explanations for security)
-- `POST /api/quizzes/:id/attempt` - Submit quiz attempt answers (`{ answers }`), compute score, save attempt, and return detailed answer review with explanations
-- `POST /api/courses/:id/study-plan` - Generate/replace personalized weekly study plan considering quiz weaknesses and available hours (`{ hoursPerWeek, examDate?, goal? }`)
-- `GET /api/courses/:id/study-plan` - Retrieve latest user study plan for the course
-- `POST /api/courses/:id/assignments` - Submit assignment via text or document upload (PDF/DOCX/TXT) for AI rubric grading (`{ title, text }` or multipart file)
-- `GET /api/courses/:id/assignments` - List student's evaluated assignments for the course
-- `GET /api/progress` - Platform-wide learning analytics: course counts, materials uploaded, quiz attempts, assignments evaluated, average score, quiz history, and per-course completion progress
-
----
-
-## Verification & Test Suites
-
-Run all automated verification test suites across the monorepo:
 ```bash
 npm test
 ```
-Or run the individual test suites:
+
+Or run each suite individually:
+
 ```bash
-# Core API permissions, uploads, and explore course logic
+# Core permissions, upload validation, Write Note disk fallback, and unenroll checks
 npm run test:api -w server
 
-# Phase 3 AI features: Quizzes, Student Sanitization, Attempt Scoring, and Analytics
+# End-to-end HTTP routes & Gemini integration (quizzes 1-25, review/delete, Ask AI, file assignment eval)
 npm run test:phase3 -w server
 ```
 
----
-
-## Frontend Pages & Features
-
-- **Landing Page (`/`)**: Dark-themed hero, feature highlights (AI Tutor, PDF Chat, Quiz Generator, Study Planner, Assignment Grader), and direct authentication entrypoints.
-- **Dashboard Overview (`/dashboard`)**:
-  - Live statistics: Enrolled Courses, Materials Uploaded, Quizzes Attempted, Assignments Evaluated, Average Quiz Score.
-  - Interactive Recharts Performance Bar Chart (recent quiz score trend out of 100%).
-  - Per-course progress bars calculating completion percentage from attempted quizzes and evaluated assignments.
-- **My Courses (`/dashboard/courses`)**: Tabbed view of Owned and Enrolled courses, course card badges, create course dialog with client validation, and empty/loading states.
-- **Explore Courses (`/dashboard/explore`)**: Browse courses available across the platform with one-click enrollment.
-- **Course Detail (`/dashboard/courses/[courseId]`)**:
-  - Course metadata (description, instructor, student and material counts).
-  - Owner controls: Edit course dialog, delete course confirmation dialog.
-  - Interactive Material Uploader: Drag-and-drop zone, file size and type validation, real XHR upload progress bar, automatic 4s polling for pending jobs with 2-minute cutoff.
-  - Material List: File icons by type, formatted size and timestamp, status badge (`PENDING`, `READY`, `FAILED`), failure reason tooltip/label, download as blob, retry button for failed jobs, and delete with confirmation.
-  - **Inline Document Summary**: Instant AI summary generation with inline expand/collapse, loading skeletons, error retry, and cached status for `READY` materials.
-  - **PDF Chat Tab**: Interactive RAG chatbot scoped to all course materials or a specific file, with real-time question length counter (500 char guardrail), source snippet citations, and empty/error states.
-  - **AI Tutor Tab**: Patient-teacher conversational interface with step-by-step reasoning, real-world examples, source badges (`[Course Material]` vs `[General Knowledge]`), and local browser-persisted chat history.
-  - **Quizzes Tab**: Generate customizable multiple-choice quizzes (3-10 questions), preview existing quizzes with question and attempt counts, take quizzes with timed/unanswered validation, and view post-submission score review with detailed per-question explanations.
-  - **Study Plan Tab**: Form for weekly hours, exam dates, and study goals generating structured weekly schedules with focus topics, hour breakdowns, and actionable study tips.
-  - **Assignments Tab**: Submit assignment work via direct text entry or document upload (PDF, DOCX, TXT) for instant AI rubric grading with numerical score out of 10, key strengths, weaknesses, and improvement suggestions.
+Manual REST testing can also be run via `server/api.http`. To grab a live Clerk JWT in development, sign in on `http://localhost:3000`, open DevTools Console, and run `await window.Clerk.session.getToken()`.
 
 ---
 
-## Architecture Highlights
+## API Reference
 
-- **Lecture Audio Transcription**: Integrated with Groq Cloud's ultra-fast Whisper endpoint (`whisper-large-v3-turbo`) for automatic speech-to-text transcription of audio lectures under 25MB directly into RAG search chunks.
-- **Theme Switching**: Full Light, Dark, and System theme switching powered by `next-themes` and `@clerk/themes`.
-- **Markdown & Code Rendering**: Real-time markdown rendering using `react-markdown`, `remark-gfm`, and `@tailwindcss/typography` across all AI summaries, chat, tutor, and quiz explanations.
+### Health & Auth
+- `GET /health` — Server and Postgres connection status (`{ status, database, timestamp }`)
+- `GET /api/auth/me` — Resolves and upserts the authenticated user record from Clerk
+
+### Courses & Enrollment
+- `GET /api/courses` — List courses owned or enrolled by the current user (includes `isOwner`)
+- `GET /api/courses/explore` — List available courses the user has not joined yet
+- `POST /api/courses` — Create a course (`{ title, description? }`)
+- `GET /api/courses/:id` — Fetch course details, owner, and materials (owner or enrolled only)
+- `PUT /api/courses/:id` — Update course details (owner only)
+- `DELETE /api/courses/:id` — Delete course and cascade materials/quizzes (owner only)
+- `POST /api/courses/:id/enroll` — Enroll in a course (non-owner only)
+- `DELETE /api/courses/:id/enroll` — Unenroll / leave an enrolled course (non-owner only)
+
+### Materials & Notes
+- `GET /api/materials/:courseId` — List all materials in a course (owner or enrolled)
+- `GET /api/materials/file/:materialId` — Stream or download a material (with `transcript` fallback for written notes)
+- `POST /api/materials/:courseId/upload` — Upload a document (`<= 50 MB`) or audio file (`<= 25 MB`) via `multipart/form-data`
+- `POST /api/materials/:courseId/text` — Create a manual text note (`{ title, content }`) and index it cleanly
+- `POST /api/materials/:materialId/summary` — Generate or fetch structured summary (`{ force?: boolean }`)
+- `POST /api/materials/:materialId/reprocess` — Retry background processing for failed/pending materials
+- `DELETE /api/materials/:materialId` — Delete a material and stored file (uploader or course owner)
+
+### Ask AI, Quizzes, Study Plans, Assignments & Progress
+- `POST /api/courses/:id/chat` — Unified Ask AI (`{ question, materialId?, mode?: 'strict' | 'tutor', history? }`)
+- `POST /api/courses/:id/tutor` — Dedicated Tutor endpoint (`{ question, history? }`, kept for API compatibility)
+- `POST /api/courses/:id/quizzes/generate` — Generate `1–25` MCQs (`{ materialId?, numQuestions?, difficulty?, topic? }`)
+- `GET /api/courses/:id/quizzes` — List quizzes with the student's latest attempt summary
+- `GET /api/quizzes/:id` — Fetch sanitized quiz questions without answer keys
+- `POST /api/quizzes/:id/attempt` — Submit answers (`-1` for skipped), score server-side, and return explanations
+- `GET /api/quizzes/:id/attempt/latest` — View full graded breakdown of the student's latest attempt
+- `DELETE /api/quizzes/:id` — Delete quiz (course owner only)
+- `POST /api/courses/:id/study-plan` — Generate or replace personalized weekly plan (`{ hoursPerWeek, examDate?, goal? }`)
+- `GET /api/courses/:id/study-plan` — Fetch current study plan for the user & course
+- `POST /api/courses/:id/assignments` — Evaluate assignment draft via text (`{ title?, text }`) or file (`PDF` / `DOCX` / `TXT`)
+- `GET /api/courses/:id/assignments` — List past evaluated submissions
+- `DELETE /api/courses/:id/assignments/:assignmentId` — Delete a submission (submitter or course owner)
+- `GET /api/progress` — Fetch platform counts, average quiz score, recent chart scores, recent courses, and per-course completion
+
+---
+
+## Deployment Architecture
+
+- **Frontend (Vercel):** Deployed from `client/` (`Root Directory: client`) with `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `CLERK_SECRET_KEY`.
+- **Backend (Render):** Deployed from `server/` (`Root Directory: server`) using `npm install --include=dev && npm run build` and `npx prisma migrate deploy && npm start`, backed by Neon PostgreSQL (`DATABASE_URL` + `DIRECT_URL`).
