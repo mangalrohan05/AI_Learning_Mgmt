@@ -28,8 +28,17 @@ import {
   AlertCircle,
   Trash2,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface PendingQuizJob {
+  tempId: string;
+  title: string;
+  numQuestions: number;
+  difficulty: 'any' | 'easy' | 'medium' | 'hard';
+  startedAt: number;
+}
 
 interface QuizItem {
   id: string;
@@ -88,12 +97,14 @@ export function CourseQuizzes({
   const { getToken } = useAuth();
   const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openingQuizId, setOpeningQuizId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteQuiz, setConfirmDeleteQuiz] = useState<QuizItem | null>(null);
 
-  // Generate Dialog State
+  // Generate Dialog & Background Jobs State
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [pendingQuizzes, setPendingQuizzes] = useState<PendingQuizJob[]>([]);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('all');
   const [numQuestions, setNumQuestions] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<'any' | 'easy' | 'medium' | 'hard'>('any');
@@ -107,19 +118,41 @@ export function CourseQuizzes({
   // Results State
   const [attemptResult, setAttemptResult] = useState<AttemptResult | null>(null);
 
+  const isMountedRef = React.useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Update elapsed timer while background quiz generation jobs are running
+  useEffect(() => {
+    if (pendingQuizzes.length === 0) return;
+    setNowTs(Date.now());
+    const timer = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [pendingQuizzes.length]);
+
   const readyMaterials = materials.filter((m) => m.status === 'READY');
 
-  async function loadQuizzes() {
-    setLoading(true);
+  async function loadQuizzes(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const token = await getToken();
       if (!token) return;
       const data = await api.getCourseQuizzes(token, courseId);
-      setQuizzes(data);
+      if (isMountedRef.current) {
+        setQuizzes(data);
+      }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load quizzes');
+      if (!silent) {
+        toast.error(err.message || 'Failed to load quizzes');
+      }
     } finally {
-      setLoading(false);
+      if (!silent && isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }
 
@@ -130,33 +163,66 @@ export function CourseQuizzes({
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     const clampedCount = Math.min(25, Math.max(1, Number(numQuestions) || 5));
-    setGenerating(true);
+    const currentMaterialId = selectedMaterialId;
+    const currentDifficulty = difficulty;
+    const trimmedTopic = topic.trim();
+
+    const baseName =
+      currentMaterialId === 'all'
+        ? 'Course'
+        : readyMaterials
+            .find((m) => m.id === currentMaterialId)
+            ?.name.replace(/\.[^/.]+$/, '') || 'Material';
+    const previewTitle = trimmedTopic
+      ? `${baseName}: ${trimmedTopic}`
+      : `${baseName} Practice Quiz`;
+
+    const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const job: PendingQuizJob = {
+      tempId,
+      title: previewTitle,
+      numQuestions: clampedCount,
+      difficulty: currentDifficulty,
+      startedAt: Date.now(),
+    };
+
+    // Collapse modal immediately and display live generating card in background
+    setPendingQuizzes((prev) => [job, ...prev]);
+    setGenerateOpen(false);
+    setTopic('');
 
     try {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
       const payload = {
-        materialId: selectedMaterialId === 'all' ? undefined : selectedMaterialId,
+        materialId: currentMaterialId === 'all' ? undefined : currentMaterialId,
         numQuestions: clampedCount,
-        difficulty: difficulty === 'any' ? undefined : difficulty,
-        topic: topic.trim() || undefined,
+        difficulty: currentDifficulty === 'any' ? undefined : currentDifficulty,
+        topic: trimmedTopic || undefined,
       };
 
-      await api.generateQuiz(token, courseId, payload);
-      toast.success(`Quiz with ${clampedCount} questions ready`);
-      setGenerateOpen(false);
-      setTopic('');
-      loadQuizzes();
+      const created = await api.generateQuiz(token, courseId, payload);
+      const freshList = await api.getCourseQuizzes(token, courseId).catch(() => null);
+
+      if (isMountedRef.current) {
+        if (freshList) {
+          setQuizzes(freshList);
+        }
+        setPendingQuizzes((prev) => prev.filter((p) => p.tempId !== tempId));
+      }
+
+      toast.success(`"${created.title}" is ready (${created.totalQuestions} questions)`);
     } catch (err: any) {
+      if (isMountedRef.current) {
+        setPendingQuizzes((prev) => prev.filter((p) => p.tempId !== tempId));
+      }
       toast.error(err.message || 'Failed to generate quiz');
-    } finally {
-      setGenerating(false);
     }
   }
 
   async function viewLastReview(quizId: string) {
-    setLoading(true);
+    setOpeningQuizId(quizId);
     try {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
@@ -166,7 +232,7 @@ export function CourseQuizzes({
     } catch (err: any) {
       toast.error(err.message || 'Failed to load past quiz review');
     } finally {
-      setLoading(false);
+      setOpeningQuizId(null);
     }
   }
 
@@ -179,7 +245,7 @@ export function CourseQuizzes({
       await api.deleteQuiz(token, confirmDeleteQuiz.id);
       toast.success(`Deleted "${confirmDeleteQuiz.title}"`);
       setConfirmDeleteQuiz(null);
-      loadQuizzes();
+      loadQuizzes(true);
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete quiz');
     } finally {
@@ -188,19 +254,23 @@ export function CourseQuizzes({
   }
 
   async function startQuiz(quizId: string) {
-    setLoading(true);
+    setOpeningQuizId(quizId);
     try {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
       const quizData = await api.getQuizForTaking(token, quizId);
+      if (!quizData.questions || quizData.questions.length === 0) {
+        toast.error('This quiz has no questions. Try generating a fresh quiz.');
+        return;
+      }
       setTakingQuiz(quizData);
       setAnswers({});
       setAttemptResult(null);
     } catch (err: any) {
       toast.error(err.message || 'Failed to load quiz');
     } finally {
-      setLoading(false);
+      setOpeningQuizId(null);
     }
   }
 
@@ -240,7 +310,7 @@ export function CourseQuizzes({
       const result = await api.submitQuizAttempt(token, takingQuiz.id, answersArray);
       setAttemptResult(result);
       setTakingQuiz(null);
-      loadQuizzes();
+      loadQuizzes(true);
       toast.success(`Quiz finished — you scored ${result.score}%`);
     } catch (err: any) {
       // Surface detailed server validation message in toast
@@ -498,12 +568,23 @@ export function CourseQuizzes({
   return (
     <>
       <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold">Practice Quizzes</h3>
-            <p className="text-xs text-muted-foreground">
-              Multiple-choice questions pulled from your course files
-            </p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold">Practice Quizzes</h3>
+              <p className="text-xs text-muted-foreground">
+                Multiple-choice questions pulled from your course files
+              </p>
+            </div>
+            {pendingQuizzes.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="gap-1.5 text-[11px] border border-primary/30 bg-primary/10 text-primary"
+              >
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Generating {pendingQuizzes.length} in background
+              </Badge>
+            )}
           </div>
           <Button
             onClick={() => setGenerateOpen(true)}
@@ -522,11 +603,11 @@ export function CourseQuizzes({
           </div>
         )}
 
-        {loading ? (
+        {loading && pendingQuizzes.length === 0 ? (
           <div className="py-12 flex justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
-        ) : quizzes.length === 0 ? (
+        ) : quizzes.length === 0 && pendingQuizzes.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-12 px-4 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3 text-muted-foreground">
               <HelpCircle className="h-6 w-6" />
@@ -538,69 +619,129 @@ export function CourseQuizzes({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {quizzes.map((q) => (
-              <Card
-                key={q.id}
-                className="p-4 border-border bg-card/60 hover:bg-card/90 transition-colors flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="font-semibold text-sm truncate">{q.title}</span>
-                    <Badge variant="outline" className="text-[10px]">
-                      {q.questionCount} Questions
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(q.createdAt).toLocaleDateString()}
-                    </span>
-                    {q.latestAttempt && (
-                      <span className="font-semibold text-primary">
-                        Last score: {q.latestAttempt.score}%
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {/* Live Background-Generating Quiz Cards */}
+            {pendingQuizzes.map((job) => {
+              const elapsedSec = Math.max(0, Math.floor((nowTs - job.startedAt) / 1000));
+              const stageText =
+                elapsedSec < 4
+                  ? 'Reading course material chunks...'
+                  : elapsedSec < 11
+                    ? 'Drafting questions & explanations with AI...'
+                    : 'Finalizing question set...';
 
-                <div className="pt-4 flex items-center justify-between gap-2">
+              return (
+                <Card
+                  key={job.tempId}
+                  className="p-4 border-primary/40 bg-primary/5 flex flex-col justify-between space-y-3"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                        <span className="font-semibold text-sm truncate text-foreground">
+                          {job.title}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">
+                        {job.numQuestions} Questions
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span>{stageText}</span>
+                      <span className="ml-auto font-mono text-[11px]">{elapsedSec}s</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <div className="h-2 w-full rounded-full bg-primary/15 overflow-hidden">
+                      <div className="h-full w-2/3 rounded-full bg-primary/60 animate-pulse" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Generating in background — you can continue browsing while it builds.
+                    </p>
+                  </div>
+                </Card>
+              );
+            })}
+
+            {quizzes.map((q) => {
+              const isEmptyQuiz = q.questionCount === 0;
+              const isOpeningThis = openingQuizId === q.id;
+
+              return (
+                <Card
+                  key={q.id}
+                  className="p-4 border-border bg-card/60 hover:bg-card/90 transition-colors flex flex-col justify-between"
+                >
                   <div>
-                    {isCourseOwner && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        aria-label="Delete quiz"
-                        onClick={() => setConfirmDeleteQuiz(q)}
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="font-semibold text-sm truncate">{q.title}</span>
+                      <Badge
+                        variant={isEmptyQuiz ? 'destructive' : 'outline'}
+                        className="text-[10px] shrink-0"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                        {isEmptyQuiz ? 'Empty' : `${q.questionCount} Questions`}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(q.createdAt).toLocaleDateString()}
+                      </span>
+                      {q.latestAttempt && (
+                        <span className="font-semibold text-primary">
+                          Last score: {q.latestAttempt.score}%
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {q.latestAttempt && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                        onClick={() => viewLastReview(q.id)}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>Last Results</span>
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs gap-1.5"
-                      onClick={() => startQuiz(q.id)}
-                    >
-                      <span>{q.latestAttempt ? 'Retake' : 'Start'} Quiz</span>
-                    </Button>
+
+                  <div className="pt-4 flex items-center justify-between gap-2">
+                    <div>
+                      {isCourseOwner && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          aria-label="Delete quiz"
+                          onClick={() => setConfirmDeleteQuiz(q)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {q.latestAttempt && !isEmptyQuiz && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={openingQuizId !== null}
+                          className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => viewLastReview(q.id)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>Last Results</span>
+                        </Button>
+                      )}
+                      {!isEmptyQuiz && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={openingQuizId !== null}
+                          className="h-8 text-xs gap-1.5"
+                          onClick={() => startQuiz(q.id)}
+                        >
+                          {isOpeningThis && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          <span>{q.latestAttempt ? 'Retake' : 'Start'} Quiz</span>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -748,17 +889,12 @@ export function CourseQuizzes({
                 variant="outline"
                 size="sm"
                 onClick={() => setGenerateOpen(false)}
-                disabled={generating}
               >
                 Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={generating} className="gap-1.5">
-                {generating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Plus className="h-3.5 w-3.5" />
-                )}
-                <span>{generating ? 'Generating...' : 'Create Quiz'}</span>
+              <Button type="submit" size="sm" className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Generate Quiz</span>
               </Button>
             </DialogFooter>
           </form>

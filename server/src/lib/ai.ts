@@ -280,7 +280,7 @@ export const QuizQuestionSchema = z.object({
   explanation: z.string().min(1),
 });
 
-export const QuizQuestionsArraySchema = z.array(QuizQuestionSchema);
+export const QuizQuestionsArraySchema = z.array(QuizQuestionSchema).min(1);
 export type QuizQuestion = z.infer<typeof QuizQuestionSchema>;
 
 /**

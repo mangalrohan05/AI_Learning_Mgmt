@@ -434,12 +434,12 @@ export default function CourseDetailPage({
         </TabsContent>
 
         {/* Tab 2: Ask AI (Unified Notes Q&A + Tutor Mode) */}
-        <TabsContent value="ask-ai" className="space-y-6">
+        <TabsContent value="ask-ai" forceMount className="space-y-6 data-[state=inactive]:hidden">
           <CourseChat courseId={courseId} materials={materials} />
         </TabsContent>
 
         {/* Tab 3: Quizzes */}
-        <TabsContent value="quizzes" className="space-y-6">
+        <TabsContent value="quizzes" forceMount className="space-y-6 data-[state=inactive]:hidden">
           <CourseQuizzes
             courseId={courseId}
             materials={materials}

@@ -107,6 +107,13 @@ export class QuizService {
       topic: input.topic,
     });
 
+    if (!questions || questions.length === 0) {
+      throw new AppError(
+        502,
+        'AI could not generate questions from these materials. Please try again.'
+      );
+    }
+
     // 5. Store Quiz in DB
     const baseName = materialName.replace(/\.[^/.]+$/, '');
     const quizTitle = input.topic?.trim()
