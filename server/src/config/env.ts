@@ -14,7 +14,18 @@ const schema = z.object({
   // Direct (non-pooled) connection — used by Prisma CLI for migrations
   DIRECT_URL: z.string().min(1, 'DIRECT_URL is required'),
   CLERK_SECRET_KEY: z.string().min(1, 'CLERK_SECRET_KEY is required'),
-  CLIENT_URL: z.string().url().default('http://localhost:3000'),
+  CLIENT_URL: z
+    .string()
+    .default('http://localhost:3000')
+    .refine(
+      (val) =>
+        val
+          .split(',')
+          .map((u) => u.trim())
+          .filter(Boolean)
+          .every((u) => z.string().url().safeParse(u).success),
+      'CLIENT_URL must be a valid URL or comma-separated list of URLs'
+    ),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().default(50),
   MAX_AUDIO_FILE_SIZE_MB: z.coerce.number().default(25),

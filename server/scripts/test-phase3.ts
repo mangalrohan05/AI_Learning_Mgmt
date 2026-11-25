@@ -25,6 +25,11 @@ async function main() {
   let httpServer: Server | null = null;
 
   try {
+    // Purge any leftover temporary material from an interrupted run
+    await prisma.material.deleteMany({
+      where: { storagePath: 'uploads/temp_phase3_ml_guide.txt' },
+    }).catch(() => {});
+
     // Create a temporary material with sample chunks for self-contained testing
     const tempMaterial = await prisma.material.create({
       data: {

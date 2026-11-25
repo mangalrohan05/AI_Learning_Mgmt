@@ -34,6 +34,17 @@ export function handleAiError(error: any): Error {
       'Rate limit reached right now — please wait a few seconds and try again.'
     );
   }
+  if (
+    message.includes('503') ||
+    message.includes('Service Unavailable') ||
+    message.includes('UNAVAILABLE') ||
+    message.includes('high demand') ||
+    message.includes('overloaded')
+  ) {
+    return new Error(
+      'The AI service is busy right now — please try again in a few seconds.'
+    );
+  }
   return new Error(message || "Couldn't reach the AI service right now. Please try again.");
 }
 
