@@ -86,7 +86,7 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
 
       setStudyPlan(data);
       setShowForm(false);
-      toast.success('Study plan created successfully!');
+      toast.success('Study plan ready');
     } catch (err: any) {
       toast.error(err.message || 'Failed to generate study plan');
     } finally {
@@ -106,9 +106,9 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
     <div className="space-y-6 pt-2 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold">Personalized Study Planner</h3>
+          <h3 className="text-sm font-semibold">Study Plan</h3>
           <p className="text-xs text-muted-foreground">
-            Structured roadmap tailored to your schedule and course topics
+            Weekly schedule based on your available hours and upcoming exams
           </p>
         </div>
         {studyPlan && !showForm && (
@@ -119,7 +119,7 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
             onClick={() => setShowForm(true)}
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span>Regenerate Plan</span>
+            <span>Update Plan</span>
           </Button>
         )}
       </div>
@@ -129,13 +129,13 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
           <form onSubmit={handleGenerate} className="space-y-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <CalendarCheck className="h-4 w-4 text-primary" />
-              <span>Configure Study Parameters</span>
+              <span>Set your study schedule</span>
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-foreground block mb-1">
-                  Hours Available per Week
+                  Hours per week
                 </label>
                 <Input
                   type="number"
@@ -150,7 +150,7 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
 
               <div>
                 <label className="text-xs font-medium text-foreground block mb-1">
-                  Target Exam Date / Deadline (Optional)
+                  Exam or deadline (optional)
                 </label>
                 <Input
                   type="date"
@@ -163,10 +163,10 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
 
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
-                Learning Goal (Optional)
+                Goal or focus areas (optional)
               </label>
               <Textarea
-                placeholder="e.g. Master model evaluation metrics and prepare for upcoming midterm exam."
+                placeholder="e.g. Finish chapters 3–5 and focus on practice problems before midterms"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 rows={2}
@@ -192,7 +192,7 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                <span>{generating ? 'Synthesizing Plan...' : 'Generate Plan'}</span>
+                <span>{generating ? 'Creating plan...' : 'Create Plan'}</span>
               </Button>
             </div>
           </form>
@@ -220,7 +220,7 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
           {/* Schedule Breakdown */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Weekly Study Milestones
+              Weekly Schedule
             </h4>
 
             {studyPlan.plan.weeklySchedule.map((item, idx) => (
@@ -254,8 +254,8 @@ export function CourseStudyPlan({ courseId }: { courseId: string }) {
           {studyPlan.plan.tips && studyPlan.plan.tips.length > 0 && (
             <Card className="border-border bg-card/60 p-4 space-y-2">
               <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
-                <span>High-Yield Study Recommendations</span>
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                <span>Study Tips</span>
               </h4>
               <ul className="space-y-1 text-xs text-muted-foreground list-disc list-inside">
                 {studyPlan.plan.tips.map((tip, i) => (

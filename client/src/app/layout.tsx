@@ -6,8 +6,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AI LMS — AI-Powered Learning Management System',
-  description: 'Upload study material, chat with your documents, and learn smarter with AI.',
+  title: 'AI LMS — Course & Study Workspace',
+  description: 'Organize lecture notes, search your course files, and review with practice quizzes.',
   icons: {
     icon: '/icon.svg',
   },

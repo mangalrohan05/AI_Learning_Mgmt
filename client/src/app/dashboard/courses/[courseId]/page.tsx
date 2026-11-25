@@ -180,7 +180,7 @@ export default function CourseDetailPage({
       });
 
       setCourse((prev) => (prev ? { ...prev, ...updated } : updated));
-      toast.success('Course updated successfully!');
+      toast.success('Changes saved');
       setEditDialogOpen(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to update course');
@@ -196,7 +196,7 @@ export default function CourseDetailPage({
       if (!token) throw new Error('Not authenticated');
 
       await api.deleteCourse(token, courseId);
-      toast.success('Course deleted successfully');
+      toast.success('Course deleted');
       router.push('/dashboard/courses');
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete course');
@@ -211,16 +211,16 @@ export default function CourseDetailPage({
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive mb-4">
           <ShieldAlert className="h-7 w-7" />
         </div>
-        <h2 className="text-xl font-bold">Access Denied (403)</h2>
+        <h2 className="text-xl font-bold">Access Restricted</h2>
         <p className="text-sm text-muted-foreground mt-2 mb-6 max-w-md">
-          You are not enrolled in this course and you do not own it. To view and study its materials, please enroll first from Explore.
+          You aren&apos;t enrolled in this course yet. Join it from Explore to access its materials.
         </p>
         <div className="flex gap-3">
           <Button asChild>
-            <Link href="/dashboard/explore">Browse Courses to Enroll</Link>
+            <Link href="/dashboard/explore">Browse Explore</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/courses">Back to My Courses</Link>
+            <Link href="/dashboard/courses">My Courses</Link>
           </Button>
         </div>
       </div>
@@ -234,9 +234,9 @@ export default function CourseDetailPage({
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mb-4 text-muted-foreground">
           <AlertCircle className="h-7 w-7" />
         </div>
-        <h2 className="text-xl font-bold">Course Not Found (404)</h2>
+        <h2 className="text-xl font-bold">Course Not Found</h2>
         <p className="text-sm text-muted-foreground mt-2 mb-6 max-w-md">
-          The course you requested does not exist or may have been deleted by the instructor.
+          This course doesn&apos;t exist or may have been deleted.
         </p>
         <Button asChild>
           <Link href="/dashboard/courses">Return to My Courses</Link>
@@ -346,17 +346,11 @@ export default function CourseDetailPage({
           <TabsTrigger value="pdf-chat" className="gap-2">
             <MessageSquare className="h-4 w-4" />
             PDF Chat
-            <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
-              AI
-            </Badge>
           </TabsTrigger>
 
           <TabsTrigger value="ai-tutor" className="gap-2">
             <Sparkles className="h-4 w-4" />
             AI Tutor
-            <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-1 bg-primary/10 text-primary border-primary/30">
-              AI
-            </Badge>
           </TabsTrigger>
 
           <TabsTrigger value="quizzes" className="gap-2">
@@ -380,9 +374,9 @@ export default function CourseDetailPage({
           {/* Uploader Card */}
           <div className="space-y-3">
             <div>
-              <h2 className="text-base font-semibold">Upload Study Material</h2>
+              <h2 className="text-base font-semibold">Upload Material</h2>
               <p className="text-xs text-muted-foreground">
-                Upload course lecture notes, PDFs, assignments, or audio recordings.
+                Add lecture notes, slides, documents, or audio recordings.
               </p>
             </div>
             <MaterialUploader
@@ -397,7 +391,7 @@ export default function CourseDetailPage({
               <div>
                 <h2 className="text-base font-semibold">Course Materials</h2>
                 <p className="text-xs text-muted-foreground">
-                  Available documents and lecture media for this course.
+                  Files and recordings shared in this course.
                 </p>
               </div>
             </div>

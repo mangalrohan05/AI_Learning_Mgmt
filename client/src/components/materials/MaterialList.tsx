@@ -232,11 +232,11 @@ export function MaterialList({
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mb-4">
           <FileText className="h-6 w-6" />
         </div>
-        <h3 className="font-semibold text-base text-foreground">No course materials yet</h3>
+        <h3 className="font-semibold text-base text-foreground">No materials yet</h3>
         <p className="text-xs text-muted-foreground mt-1 max-w-sm">
           {isCourseOwner
-            ? 'Upload lecture notes, slides, or documents above to kickstart the course.'
-            : 'The instructor has not uploaded any study materials yet. Check back soon!'}
+            ? 'Upload notes, slides, or audio recordings above to get started.'
+            : 'Nothing has been uploaded to this course yet.'}
         </p>
       </div>
     );
@@ -386,7 +386,7 @@ export function MaterialList({
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-primary" />
                       <span className="text-xs font-semibold text-foreground">
-                        Document Summary
+                        Summary
                       </span>
                       {summaryState.cached && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -408,7 +408,7 @@ export function MaterialList({
                     <div className="space-y-2 py-3">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                        <span>Synthesizing concise summary with Gemini...</span>
+                        <span>Generating summary...</span>
                       </div>
                       <Skeleton className="h-4 w-full" />
                       <Skeleton className="h-4 w-5/6" />
@@ -445,13 +445,13 @@ export function MaterialList({
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Delete Study Material?</DialogTitle>
+            <DialogTitle>Delete material?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{' '}
+              Delete{' '}
               <strong className="text-foreground">
-                "{confirmDeleteMaterial?.name}"
+                &ldquo;{confirmDeleteMaterial?.name}&rdquo;
               </strong>
-              ? This action cannot be undone.
+              ? This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

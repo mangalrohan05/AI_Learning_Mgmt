@@ -4,9 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Markdown } from '@/components/ui/markdown';
 import {
   GraduationCap,
@@ -15,8 +13,6 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
-  Sparkles,
-  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,7 +31,7 @@ export function CourseTutor({ courseId }: { courseId: string }) {
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hello! I am your AI Course Tutor. Ask me any conceptual question, and I'll explain it step by step with concrete examples. If I share general concepts outside your course notes, I will clearly label them as [General Knowledge].",
+        "Hi! Ask me about any topic in this course and I'll walk through it step by step with an example. Anything not covered in your uploaded notes will be tagged [General Knowledge].",
       timestamp: new Date(),
     },
   ]);
@@ -102,7 +98,7 @@ export function CourseTutor({ courseId }: { courseId: string }) {
           role: 'assistant',
           content:
             err.message ||
-            'I encountered an error communicating with the AI service. Please try again.',
+            "Couldn't get a response right now. Please try again.",
           timestamp: new Date(),
         },
       ]);
@@ -124,20 +120,11 @@ export function CourseTutor({ courseId }: { courseId: string }) {
             <GraduationCap className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              AI Course Tutor
-              <Badge variant="outline" className="text-[10px] font-mono">
-                Interactive
-              </Badge>
-            </h3>
+            <h3 className="text-sm font-semibold">Course Tutor</h3>
             <p className="text-xs text-muted-foreground">
-              Patient step-by-step explanations with illustrative examples
+              Walk through topics step by step with worked examples
             </p>
           </div>
-        </div>
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-3 py-1 rounded-lg">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span>Keeps in-browser conversation memory</span>
         </div>
       </div>
 
@@ -225,7 +212,7 @@ export function CourseTutor({ courseId }: { courseId: string }) {
             <div className="bg-card border border-border/80 rounded-2xl rounded-bl-none px-4 py-3 text-sm flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-muted-foreground">
-                Thinking step-by-step with examples...
+                Thinking...
               </span>
             </div>
           </div>
@@ -245,7 +232,7 @@ export function CourseTutor({ courseId }: { courseId: string }) {
                 handleSend(e);
               }
             }}
-            placeholder="Ask a conceptual question (e.g. 'Explain gradient descent step by step with an intuitive analogy')..."
+            placeholder="Ask a question about a concept or problem..."
             rows={2}
             className="pr-14 resize-none text-sm bg-background/80"
             maxLength={500}

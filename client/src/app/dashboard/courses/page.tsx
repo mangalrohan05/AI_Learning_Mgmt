@@ -93,7 +93,7 @@ export default function CoursesPage() {
         description: description.trim() || undefined,
       });
 
-      toast.success(`Course "${created.title}" created successfully!`);
+      toast.success(`Created "${created.title}"`);
       setTitle('');
       setDescription('');
       setDialogOpen(false);
@@ -114,7 +114,7 @@ export default function CoursesPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">My Courses</h1>
           <p className="text-sm text-muted-foreground">
-            Manage your created courses or view courses you are currently enrolled in.
+            Courses you teach or take.
           </p>
         </div>
 
@@ -123,15 +123,15 @@ export default function CoursesPage() {
           <DialogTrigger asChild>
             <Button className="gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
-              Create Course
+              New Course
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[480px]">
             <form onSubmit={handleCreateCourse}>
               <DialogHeader>
-                <DialogTitle>Create New Course</DialogTitle>
+                <DialogTitle>New Course</DialogTitle>
                 <DialogDescription>
-                  Enter a title and brief overview. You will be set as the course owner.
+                  Add a title and optional overview for your course.
                 </DialogDescription>
               </DialogHeader>
 
@@ -223,11 +223,11 @@ export default function CoursesPage() {
           ) : ownedCourses.length === 0 ? (
             <EmptyState
               title="No courses created yet"
-              description="Get started by creating your first course to upload lecture material and study notes."
+              description="Create your first course to upload notes and study materials."
               action={
                 <Button onClick={() => setDialogOpen(true)} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Create Your First Course
+                  Create Course
                 </Button>
               }
             />
@@ -246,8 +246,8 @@ export default function CoursesPage() {
             <CourseSkeletonGrid />
           ) : enrolledCourses.length === 0 ? (
             <EmptyState
-              title="Not enrolled in any course"
-              description="Explore courses created by other students or instructors to start learning."
+              title="Not enrolled in any courses"
+              description="Browse Explore to join courses shared by instructors."
               action={
                 <Button asChild className="gap-2">
                   <Link href="/dashboard/explore">

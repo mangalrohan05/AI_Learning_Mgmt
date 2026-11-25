@@ -80,7 +80,7 @@ export function MaterialUploader({
   async function uploadSingleFile(uploadItem: UploadingFile) {
     const token = await getToken();
     if (!token) {
-      toast.error('Authentication required for uploading');
+      toast.error('Please sign in to upload files');
       return;
     }
 
@@ -109,7 +109,7 @@ export function MaterialUploader({
               : item
           )
         );
-        toast.success(`Uploaded "${uploadItem.file.name}" successfully!`);
+        toast.success(`Uploaded "${uploadItem.file.name}"`);
         onUploadSuccess();
       } else {
         let errorMsg = 'Upload failed';
@@ -217,10 +217,10 @@ export function MaterialUploader({
         </div>
 
         <h3 className="font-semibold text-base">
-          Click to upload or drag & drop files here
+          Drop files here, or click to browse
         </h3>
         <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-          PDF, DOCX, TXT (up to 50 MB) and lecture audio MP3, WAV, M4A (up to 25 MB).
+          PDF, Word, or text files up to 50 MB. Audio up to 25 MB.
         </p>
 
         <div className="flex items-center gap-3 mt-4 text-[11px] text-muted-foreground font-medium">

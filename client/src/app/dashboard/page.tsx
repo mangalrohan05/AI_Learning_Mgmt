@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   BookOpen,
   GraduationCap,
-  Sparkles,
   FileText,
   HelpCircle,
   Award,
@@ -83,19 +82,11 @@ export default function DashboardOverviewPage() {
       <div className="rounded-2xl border border-border bg-gradient-to-r from-card via-card/80 to-primary/10 p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="default" className="text-[10px]">
-                AI-Powered Learning
-              </Badge>
-              <span className="text-xs text-muted-foreground font-medium">
-                AI Tutor • Quizzes • Study Planner • Assignments
-              </span>
-            </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-              Welcome back, {user?.firstName || 'Student'}! 👋
+              Welcome back, {user?.firstName || 'there'}
             </h1>
             <p className="text-sm md:text-base text-muted-foreground">
-              Track your quiz performances, monitor course completion, and use AI study tools.
+              Your courses, recent quiz scores, and progress at a glance.
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
@@ -113,7 +104,7 @@ export default function DashboardOverviewPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-medium">Active Courses</CardTitle>
+            <CardTitle className="text-xs font-medium">Courses</CardTitle>
             <GraduationCap className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -128,7 +119,7 @@ export default function DashboardOverviewPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-medium">Materials Uploaded</CardTitle>
+            <CardTitle className="text-xs font-medium">Materials</CardTitle>
             <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -139,13 +130,13 @@ export default function DashboardOverviewPage() {
                 {progress?.counts.materialsUploaded ?? 0}
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-1">Documents & notes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Files & recordings</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-medium">Quizzes Attempted</CardTitle>
+            <CardTitle className="text-xs font-medium">Quizzes Taken</CardTitle>
             <HelpCircle className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -156,13 +147,13 @@ export default function DashboardOverviewPage() {
                 {progress?.counts.quizzesAttempted ?? 0}
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-1">Practice sessions</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Completed attempts</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-medium">Assignments Evaluated</CardTitle>
+            <CardTitle className="text-xs font-medium">Assignments</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -173,7 +164,7 @@ export default function DashboardOverviewPage() {
                 {progress?.counts.assignmentsEvaluated ?? 0}
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-1">AI graded submissions</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Graded submissions</p>
           </CardContent>
         </Card>
 
@@ -190,7 +181,7 @@ export default function DashboardOverviewPage() {
                 {progress?.averageQuizScore ?? 0}%
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-1">Across all quizzes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Across quizzes</p>
           </CardContent>
         </Card>
       </div>
@@ -207,12 +198,9 @@ export default function DashboardOverviewPage() {
                   Recent Quiz Scores
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Score trends across your last 10 quiz attempts
+                  Your last 10 quiz attempts
                 </CardDescription>
               </div>
-              <Badge variant="outline" className="text-[10px]">
-                Last 10 Attempts
-              </Badge>
             </div>
 
             {loading ? (
@@ -268,7 +256,7 @@ export default function DashboardOverviewPage() {
                 <TrendingUp className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm font-semibold">No quiz attempts yet</p>
                 <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                  Take a practice quiz in any of your courses to view your score trends and retention insights!
+                  Take a quiz in any course to see your scores here.
                 </p>
               </div>
             )}
@@ -282,10 +270,10 @@ export default function DashboardOverviewPage() {
               <div>
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-primary" />
-                  Course Quiz Completion
+                  Course Progress
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Quizzes attempted at least once per course
+                  Quizzes tried in each course
                 </CardDescription>
               </div>
             </div>
@@ -328,9 +316,9 @@ export default function DashboardOverviewPage() {
             ) : (
               <div className="h-64 flex flex-col items-center justify-center border border-dashed border-border rounded-xl text-center p-6">
                 <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm font-semibold">No courses found</p>
+                <p className="text-sm font-semibold">No courses yet</p>
                 <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                  Enroll in a course from the Explore catalog to track your learning journey.
+                  Create a course or join one from Explore to track your progress.
                 </p>
               </div>
             )}

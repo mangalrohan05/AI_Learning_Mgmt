@@ -93,7 +93,7 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
         file: selectedFile || undefined,
       });
 
-      toast.success(`Evaluated! Grade: ${result.score}/10`);
+      toast.success(`Graded: ${result.score}/10`);
       setTitle('');
       setText('');
       setSelectedFile(null);
@@ -114,9 +114,9 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
         {/* Left: Submission Form */}
         <div className="lg:col-span-5 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold">Submit for AI Evaluation</h3>
+            <h3 className="text-sm font-semibold">Submit Assignment</h3>
             <p className="text-xs text-muted-foreground">
-              Submit essays, problem sets, or code reviews for instant rubric grading
+              Paste your draft or attach a document for rubric feedback
             </p>
           </div>
 
@@ -124,10 +124,10 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-foreground block mb-1">
-                  Assignment Title
+                  Title (optional)
                 </label>
                 <Input
-                  placeholder="e.g. Essay on Gradient Descent Optimization"
+                  placeholder="e.g. Week 4 Essay on Gradient Descent"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="h-9 text-xs"
@@ -136,10 +136,10 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
 
               <div>
                 <label className="text-xs font-medium text-foreground block mb-1">
-                  Submission Text
+                  Your work
                 </label>
                 <Textarea
-                  placeholder="Paste your essay, case analysis, or responses here..."
+                  placeholder="Paste your essay, write-up, or answers here..."
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   rows={6}
@@ -149,7 +149,7 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
 
               <div>
                 <label className="text-xs font-medium text-foreground block mb-1">
-                  Or Upload Document (PDF, DOCX, TXT)
+                  Or attach a file (PDF, DOCX, TXT)
                 </label>
                 <input
                   type="file"
@@ -159,7 +159,7 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
                   className="text-xs w-full file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 text-muted-foreground"
                 />
                 {selectedFile && (
-                  <p className="text-[11px] text-emerald-400 mt-1">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
                     Attached: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                   </p>
                 )}
@@ -175,7 +175,7 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
                 ) : (
                   <Sparkles className="h-4 w-4" />
                 )}
-                <span>{submitting ? 'Evaluating Submission...' : 'Grade & Evaluate'}</span>
+                <span>{submitting ? 'Grading...' : 'Submit for grading'}</span>
               </Button>
             </form>
           </Card>
@@ -184,9 +184,9 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
         {/* Right: Feedback & Past Submissions */}
         <div className="lg:col-span-7 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold">Evaluation Results</h3>
+            <h3 className="text-sm font-semibold">Feedback</h3>
             <p className="text-xs text-muted-foreground">
-              Detailed scores, strengths, weaknesses, and concrete recommendations
+              Score breakdown and revision notes
             </p>
           </div>
 
@@ -221,8 +221,8 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
 
               {/* Strengths & Weaknesses */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Card className="border-emerald-500/30 bg-emerald-950/10 p-4 space-y-2">
-                  <h5 className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                <Card className="border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+                  <h5 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span>Strengths</span>
                   </h5>
@@ -233,10 +233,10 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
                   </ul>
                 </Card>
 
-                <Card className="border-rose-500/30 bg-rose-950/10 p-4 space-y-2">
-                  <h5 className="text-xs font-semibold text-rose-400 flex items-center gap-1.5">
+                <Card className="border-rose-500/30 bg-rose-500/5 p-4 space-y-2">
+                  <h5 className="text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                     <AlertCircle className="h-3.5 w-3.5" />
-                    <span>Areas for Growth</span>
+                    <span>What to improve</span>
                   </h5>
                   <ul className="space-y-1 text-xs text-foreground/80 list-disc list-inside">
                     {selectedAssignment.feedback.weaknesses.map((w, i) => (
@@ -251,7 +251,7 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
                 <Card className="border-border bg-card/60 p-4 space-y-2">
                   <h5 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                    <span>Concrete Recommendations for Improvement</span>
+                    <span>Suggestions</span>
                   </h5>
                   <ul className="space-y-1.5 text-xs text-muted-foreground">
                     {selectedAssignment.feedback.suggestions.map((sug, i) => (
@@ -298,9 +298,9 @@ export function CourseAssignments({ courseId }: { courseId: string }) {
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3 text-muted-foreground">
                 <FileText className="h-6 w-6" />
               </div>
-              <h4 className="text-sm font-semibold">No submissions evaluated yet</h4>
+              <h4 className="text-sm font-semibold">No submissions yet</h4>
               <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                Submit an assignment or essay using the form on the left to receive an AI rubric score and feedback.
+                Submit your work on the left to see your score and revision notes here.
               </p>
             </div>
           )}

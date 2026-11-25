@@ -45,7 +45,7 @@ export default function ExploreCoursesPage() {
       if (!token) throw new Error('Not authenticated');
 
       await api.enrollCourse(token, course.id);
-      toast.success(`Enrolled in "${course.title}"!`);
+      toast.success(`Enrolled in ${course.title}`);
 
       // Optimistically remove from explore list
       setCourses((prev) => prev.filter((c) => c.id !== course.id));
@@ -66,7 +66,7 @@ export default function ExploreCoursesPage() {
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Explore Courses</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Browse public courses from other instructors and students. Enroll with one click.
+            Browse available courses and join with one click.
           </p>
         </div>
 
@@ -108,9 +108,9 @@ export default function ExploreCoursesPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
             <CheckCircle2 className="h-6 w-6" />
           </div>
-          <h3 className="text-base font-semibold">You're all caught up!</h3>
+          <h3 className="text-base font-semibold">Nothing new to join</h3>
           <p className="text-sm text-muted-foreground max-w-sm mt-1 mb-6">
-            There are no other courses available to enroll in right now. You either own them or are already enrolled.
+            You already own or are enrolled in every available course.
           </p>
           <Button asChild>
             <Link href="/dashboard/courses">Go to My Courses</Link>

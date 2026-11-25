@@ -31,10 +31,10 @@ export function handleAiError(error: any): Error {
     message.includes('rate limit')
   ) {
     return new Error(
-      'The AI service is currently experiencing high demand or rate limits. Please try again in a few moments.'
+      'Rate limit reached right now — please wait a few seconds and try again.'
     );
   }
-  return new Error(message || 'Failed to communicate with AI service.');
+  return new Error(message || "Couldn't reach the AI service right now. Please try again.");
 }
 
 /**
@@ -121,7 +121,7 @@ export async function answerWithContext(
   contexts: { materialName: string; content: string }[]
 ): Promise<string> {
   if (contexts.length === 0) {
-    return 'I could not find any relevant information in the course materials to answer your question.';
+    return "I couldn't find anything about that in your uploaded course materials.";
   }
 
   const formattedContexts = contexts
@@ -131,11 +131,11 @@ export async function answerWithContext(
     )
     .join('\n\n---\n\n');
 
-  const systemPrompt = `You are an AI teaching assistant for this course.
-Your task is to answer the student's question using ONLY the facts directly mentioned in the provided context snippets.
-If the answer cannot be determined from the context, respond clearly:
-"Based on the provided course materials, I cannot find an answer to this question."
-Do NOT speculate, guess, or incorporate external knowledge not present in the snippets. Keep your tone encouraging, professional, and concise.`;
+  const systemPrompt = `You are a teaching assistant for this course.
+Answer the student's question using ONLY the facts directly stated in the provided excerpts.
+If the excerpts don't cover the answer, reply directly:
+"I couldn't find an answer to that in the provided course materials."
+Do NOT guess or add external knowledge. Keep your tone natural, direct, and concise.`;
 
   const userPrompt = `Context from course materials:
 ${formattedContexts}
@@ -175,13 +175,13 @@ export async function answerAsTutor(
     )
     .join('\n\n---\n\n');
 
-  const systemPrompt = `You are a patient, encouraging, and pedagogically skilled AI tutor for this course.
+  const systemPrompt = `You are a patient, helpful tutor for this course.
 Guidelines:
-1. Explain concepts step by step in clear, accessible language.
-2. Provide a short, illustrative example to solidify understanding.
-3. Ground your explanation primarily in the provided course materials whenever relevant.
-4. You may supplement with general academic knowledge when helpful for conceptual clarity, but you MUST clearly prefix or mark any outside knowledge with "[General Knowledge]".
-5. Maintain a supportive, enthusiastic, and approachable tone.`;
+1. Explain concepts step by step in plain, clear language.
+2. Include a short, concrete example to make the idea stick.
+3. Base your explanation on the provided course materials whenever relevant.
+4. You may include outside academic facts when needed for clarity, but clearly prefix them with "[General Knowledge]".
+5. Write naturally like a human tutor — direct, clear, and without empty filler praise.`;
 
   const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
 
@@ -221,13 +221,12 @@ Tutor Explanation:`;
  * Generates a concise structured summary from material text
  */
 export async function summarizeText(content: string): Promise<string> {
-  const systemPrompt = `You are an expert academic tutor.
-Generate a concise, clear, and structured summary of the provided course material.
-Include:
-1. Overview / Core Topic
-2. Key Concepts & Definitions
-3. Essential Takeaways
-Format with clean Markdown. Be concise and prioritize high-yield study points.`;
+  const systemPrompt = `Summarize the provided course material clearly and concisely using clean Markdown.
+Cover:
+- A short overview of the topic
+- Key concepts and definitions
+- Essential takeaways
+Write directly and stick to the material's main points.`;
 
   try {
     const response = await chatModel.invoke([
@@ -306,17 +305,16 @@ export async function generateStudyPlan(
   weakTopics: string[],
   options: { hoursPerWeek: number; examDate?: string; goal?: string }
 ): Promise<StudyPlanData> {
-  const systemPrompt = `You are an academic advisor creating a structured study plan for a student.
-Create an achievable, structured study plan.
+  const systemPrompt = `You are an academic advisor building a practical weekly study plan for a student.
 Output format: JSON object with:
-- "title": string (e.g. "4-Week Machine Learning Mastery Plan")
-- "overview": string (concise encouraging summary of strategy)
+- "title": string (e.g. "4-Week Machine Learning Study Plan")
+- "overview": string (short, practical summary of the plan)
 - "weeklySchedule": array of objects:
     - "period": string (e.g. "Week 1: Fundamentals", "Day 1-3")
     - "topic": string (focus area)
-    - "tasks": array of strings (actionable items: review note X, practice quiz Y)
-    - "estimatedHours": number (allocating student's available hours)
-- "tips": array of strings (high-yield exam and retention strategies)`;
+    - "tasks": array of strings (concrete study tasks like reviewing notes or taking practice quizzes)
+    - "estimatedHours": number (matching the student's weekly hours)
+- "tips": array of strings (practical study tips)`;
 
   const userPrompt = `Student Study Parameters:
 - Target Hours per Week: ${options.hoursPerWeek || 5} hours
@@ -346,14 +344,14 @@ export async function evaluateAssignmentText(
   submissionText: string,
   courseContext: string
 ): Promise<AssignmentFeedback> {
-  const systemPrompt = `You are a fair, thorough academic professor grading an assignment submission.
-Evaluate the student's submission against academic standards and course context.
+  const systemPrompt = `You are a professor grading a student assignment.
+Review the work fairly against college standards and the course context. Write naturally and specifically, without generic filler.
 Provide:
-- "score": number from 0 to 10 (can include decimals like 8.5)
-- "summary": string (overall evaluation summary)
-- "strengths": array of 2-4 strings (specific strong aspects)
-- "weaknesses": array of 1-3 strings (areas that lacked depth or clarity)
-- "suggestions": array of 2-4 strings (concrete steps for improvement)
+- "score": number from 0 to 10 (decimals like 8.5 allowed)
+- "summary": string (clear, concise overall feedback)
+- "strengths": array of 2-4 strings (what worked well)
+- "weaknesses": array of 1-3 strings (what was missing or unclear)
+- "suggestions": array of 2-4 strings (specific ways to improve the work)
 Output format: JSON object matching this schema strictly.`;
 
   const userPrompt = `Course Context:

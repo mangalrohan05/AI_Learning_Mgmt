@@ -58,8 +58,8 @@ export default function DashboardLayout({
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <span className="font-semibold text-sm tracking-wide text-muted-foreground hidden sm:inline-block">
-              Student & Instructor Portal
+            <span className="font-medium text-sm text-muted-foreground hidden sm:inline-block">
+              Workspace
             </span>
           </div>
 

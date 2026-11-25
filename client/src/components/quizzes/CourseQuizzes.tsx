@@ -133,7 +133,7 @@ export function CourseQuizzes({
       };
 
       await api.generateQuiz(token, courseId, payload);
-      toast.success('Quiz generated successfully!');
+      toast.success('Quiz ready');
       setGenerateOpen(false);
       loadQuizzes();
     } catch (err: any) {
@@ -197,7 +197,7 @@ export function CourseQuizzes({
       setAttemptResult(result);
       setTakingQuiz(null);
       loadQuizzes();
-      toast.success(`Quiz completed! You scored ${result.score}%`);
+      toast.success(`Quiz finished — you scored ${result.score}%`);
     } catch (err: any) {
       // Surface detailed server validation message in toast
       let msg = err.message || 'Failed to submit quiz attempt';
@@ -277,15 +277,15 @@ export function CourseQuizzes({
             <Card
               key={i}
               className={`p-4 border ${
-                res.isCorrect ? 'border-emerald-500/30 bg-emerald-950/10' : 'border-rose-500/30 bg-rose-950/10'
+                res.isCorrect ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-rose-500/30 bg-rose-500/5'
               }`}
             >
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
                   {res.isCorrect ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   ) : (
-                    <XCircle className="h-5 w-5 text-rose-400" />
+                    <XCircle className="h-5 w-5 text-rose-500" />
                   )}
                 </div>
                 <div className="space-y-2 min-w-0 flex-1">
@@ -300,9 +300,9 @@ export function CourseQuizzes({
 
                       let style = 'border-border/60 bg-card/40 text-muted-foreground';
                       if (isRight) {
-                        style = 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300 font-semibold';
+                        style = 'border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold';
                       } else if (isSelected && !isRight) {
-                        style = 'border-rose-500/60 bg-rose-500/10 text-rose-300 line-through';
+                        style = 'border-rose-500/60 bg-rose-500/10 text-rose-700 dark:text-rose-300 line-through';
                       }
 
                       return (
@@ -311,8 +311,8 @@ export function CourseQuizzes({
                           className={`p-2.5 rounded-lg border ${style} flex items-center justify-between`}
                         >
                           <span>{opt}</span>
-                          {isRight && <span className="text-[10px] uppercase font-bold text-emerald-400">Correct</span>}
-                          {isSelected && !isRight && <span className="text-[10px] uppercase font-bold text-rose-400">Your Answer</span>}
+                          {isRight && <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Correct</span>}
+                          {isSelected && !isRight && <span className="text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400">Your Answer</span>}
                         </div>
                       );
                     })}
@@ -367,7 +367,7 @@ export function CourseQuizzes({
         <div>
           <h2 className="text-lg font-bold">{takingQuiz.title}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Select an answer for each question. All questions must be answered before submitting.
+            Choose an option for each question, or leave questions blank to skip.
           </p>
         </div>
 
@@ -456,9 +456,9 @@ export function CourseQuizzes({
       <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold">Course Quizzes</h3>
+            <h3 className="text-sm font-semibold">Practice Quizzes</h3>
             <p className="text-xs text-muted-foreground">
-              Test your mastery with AI-generated practice questions
+              Multiple-choice questions pulled from your course files
             </p>
           </div>
           <Button
@@ -468,13 +468,13 @@ export function CourseQuizzes({
             className="gap-1.5 h-8 text-xs"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Generate Quiz</span>
+            <span>New Quiz</span>
           </Button>
         </div>
 
         {readyMaterials.length === 0 && (
           <div className="p-4 rounded-xl border border-border/80 bg-muted/20 text-center text-xs text-muted-foreground">
-            Upload and process course materials first to unlock automated quiz generation.
+            Upload and process a file in Materials first to create quizzes.
           </div>
         )}
 
@@ -487,9 +487,9 @@ export function CourseQuizzes({
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3 text-muted-foreground">
               <HelpCircle className="h-6 w-6" />
             </div>
-            <h4 className="text-sm font-semibold">No quizzes created yet</h4>
+            <h4 className="text-sm font-semibold">No quizzes yet</h4>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-              Click "Generate Quiz" above to create an automated practice quiz from your course materials.
+              Generate a practice quiz from your uploaded notes to test yourself.
             </p>
           </div>
         ) : (
@@ -513,7 +513,7 @@ export function CourseQuizzes({
                     </span>
                     {q.latestAttempt && (
                       <span className="font-semibold text-primary">
-                        Best Score: {q.latestAttempt.score}%
+                        Last score: {q.latestAttempt.score}%
                       </span>
                     )}
                   </div>
@@ -539,23 +539,23 @@ export function CourseQuizzes({
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Generate Practice Quiz</DialogTitle>
+            <DialogTitle>New Practice Quiz</DialogTitle>
             <DialogDescription>
-              Gemini will generate multiple-choice questions grounded in your course materials.
+              Creates multiple-choice questions based on your course files.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleGenerate} className="space-y-4 py-2">
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
-                Source Material
+                Based on
               </label>
               <select
                 value={selectedMaterialId}
                 onChange={(e) => setSelectedMaterialId(e.target.value)}
                 className="w-full h-9 rounded-lg border border-border bg-background px-3 text-xs"
               >
-                <option value="all">All course materials</option>
+                <option value="all">All materials</option>
                 {readyMaterials.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -566,7 +566,7 @@ export function CourseQuizzes({
 
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
-                Number of Questions (3 - 10)
+                Questions (3–10)
               </label>
               <input
                 type="number"

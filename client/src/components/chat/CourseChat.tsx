@@ -10,12 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Markdown } from '@/components/ui/markdown';
 import {
   MessageSquare,
-  Sparkles,
   Send,
   Loader2,
   FileText,
   AlertCircle,
-  HelpCircle,
   Layers,
   ChevronDown,
   ChevronUp,
@@ -112,14 +110,14 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card/60">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Layers className="h-4 w-4 text-primary" />
-          <span>Source Scope:</span>
+          <span>Search in:</span>
           <select
             value={selectedMaterialId}
             onChange={(e) => setSelectedMaterialId(e.target.value)}
             className="h-8 rounded-lg border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             disabled={!hasReadyMaterials || loading}
           >
-            <option value="all">All Course Materials ({readyMaterials.length} ready)</option>
+            <option value="all">All materials ({readyMaterials.length})</option>
             {readyMaterials.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
@@ -135,21 +133,20 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
             onClick={() => setMessages([])}
             className="text-xs text-muted-foreground hover:text-foreground self-start sm:self-auto"
           >
-            Clear Conversation
+            Clear chat
           </Button>
         )}
       </div>
 
       {/* Guardrail Notice: No Ready Materials */}
       {!hasReadyMaterials && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
-          <AlertCircle className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
+          <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
           <div>
-            <p className="font-semibold text-amber-100">No ready materials yet</p>
-            <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
-              Upload PDF, DOCX, or TXT study materials in the <strong>Materials</strong> tab.
-              Once the background vector processing completes (status becomes <strong>READY</strong>),
-              you can ask questions directly against your course content!
+            <p className="font-semibold text-amber-900 dark:text-amber-100">No processed files yet</p>
+            <p className="text-xs text-amber-800/80 dark:text-amber-200/80 mt-1 leading-relaxed">
+              Upload a PDF, Word doc, text file, or recording in the <strong>Materials</strong> tab.
+              Once it finishes processing (<strong>READY</strong>), you can ask questions about it here.
             </p>
           </div>
         </div>
@@ -163,8 +160,8 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
               <Textarea
                 placeholder={
                   hasReadyMaterials
-                    ? 'Ask a question about the concepts in your course materials...'
-                    : 'Upload ready materials first to enable course Q&A'
+                    ? 'Ask a question about your notes...'
+                    : 'Upload and process a file first to ask questions'
                 }
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
@@ -186,8 +183,7 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span>Powered by Gemini 1.5 Flash + pgvector</span>
+                <span>Answers are pulled from your selected course files</span>
               </div>
 
               <Button
@@ -199,12 +195,12 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
                 {loading ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Searching...</span>
+                    <span>Checking notes...</span>
                   </>
                 ) : (
                   <>
                     <Send className="h-3.5 w-3.5" />
-                    <span>Ask AI</span>
+                    <span>Ask</span>
                   </>
                 )}
               </Button>
@@ -221,11 +217,10 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
               <MessageSquare className="h-6 w-6" />
             </div>
             <h3 className="text-base font-semibold text-foreground">
-              Ask anything about this course
+              Ask about your course files
             </h3>
             <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-              Questions are answered strictly using retrieved excerpts from your course materials.
-              Sources are cited with exact snippets.
+              Replies rely strictly on your uploaded materials and include the matching excerpts below.
             </p>
           </div>
         ) : (
@@ -273,8 +268,8 @@ export function CourseChat({ courseId, materials }: CourseChatProps) {
                           >
                             <FileText className="h-3.5 w-3.5" />
                             <span>
-                              {msg.sources.length} Referenced Context{' '}
-                              {msg.sources.length === 1 ? 'Source' : 'Sources'}
+                              {msg.sources.length}{' '}
+                              {msg.sources.length === 1 ? 'source' : 'sources'}
                             </span>
                             {isSourcesOpen ? (
                               <ChevronUp className="h-3 w-3" />
